@@ -4,6 +4,8 @@ A rental operations platform: customers book their own dates online, and the des
 runs quotations, reservations, handovers, returns, invoicing and reporting from
 one record.
 
+Live at **https://rental-management-alpha.vercel.app**
+
 Built for Problem Statement 3 (Rental Management). The operator brand, catalog
 and customers are invented; the mechanics are real.
 
@@ -102,25 +104,31 @@ Tailwind v4, Recharts, Phosphor icons, the Anthropic SDK with structured outputs
 
 ## Data
 
-Out of the box the app runs on a seeded in-memory dataset built at first request:
-22 products, 5 pricelists, 7 customers and 30 orders spread across the trailing
+Transactional state lives in Postgres (Neon, attached through Vercel): orders,
+lines, reservations, deliveries, invoices, payments, notifications and reminder
+lead times. The catalog, pricelists, customers and fee rules stay as constants in
+the code because they are configuration rather than state, which keeps every
+lookup against them synchronous.
+
+The schema bootstraps itself. On first request the tables are created if absent,
+and when the orders table is empty the demo dataset is generated and inserted: 22
+products, 5 pricelists, 7 customers and 30 orders spread across the trailing
 twelve months, anchored to today so there is always something overdue, something
-out and something upcoming.
+out with a customer and something upcoming. There is no migration step to run.
 
-**This dataset lives in the server process.** It is right for a demo and for local
-work, but on serverless hosting each instance holds its own copy, so a change made
-on one request is not guaranteed to be visible on the next. For durable
-multi-user state, point it at Postgres:
+With no database attached the app falls back to an in-process copy of the same
+dataset. That is right for local development, where there is one server process.
+It is **not** sufficient on serverless: each function gets its own copy, so an
+order created by the API route is invisible to the page that should display it.
+This was measured rather than assumed, and it is why the database exists.
 
-1. Create a Supabase project.
-2. Run `supabase/schema.sql` in the SQL editor. It creates the enums, tables,
-   indexes and an `available_units(product, from, to)` function that does the
-   overlap arithmetic in the database.
-3. Put the project URL and keys in `.env.local` and in the Vercel project.
+The console dashboard has a **Reset demo data** control that restores the seeded
+state, so the same walkthrough can be run twice.
 
-The domain layer (`lib/domain/`) is pure and takes its data as arguments, so
-swapping the store underneath it does not touch the pricing, availability or fee
-logic.
+To attach a database: Vercel project, Storage, create a Neon Postgres database,
+connect it to the project, redeploy. `GET /api/health` reports whether a
+connection string was found, whether it connects, and which commit is serving
+the request, without exposing any values.
 
 ## Layout
 
@@ -132,12 +140,13 @@ app/
   portal/             customer: rentals, invoices, payments, reminders
   console/            desk: dashboard, orders, collections, fleet,
                       pricelists, invoicing, reminders, reports
-  api/                quote, orders, AI endpoints, report exports
+  api/                quote, orders, kit endpoints, report exports, health
 lib/
-  domain/             pricing, availability, fees, quoting, reports (pure)
-  data/               seed, in-memory store, mutations
-  ai/                 Claude clients for kit search, recommendations, brief
-supabase/schema.sql   Postgres schema
+  domain/             pricing, availability, fees, quoting, reports (pure,
+                      all take their data as arguments)
+  data/               seed, dataset assembly, mutations, persistence
+  db/                 Postgres client, schema bootstrap, repository
+  ai/                 rule engine, co-rental affinity, optional Claude clients
 ```
 
 ## Notes on the numbers
