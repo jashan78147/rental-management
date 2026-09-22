@@ -55,6 +55,17 @@ const SIZE = {
   hero: { box: "aspect-[4/3] w-full rounded-2xl", icon: 64 },
 } as const;
 
+/**
+ * The single most distinguishing number on an item: "Full frame", "600W",
+ * "15 kVA", "50 chairs". Without it three cameras in a row are the same tile.
+ */
+function headlineSpec(specs: Record<string, string> | undefined): string | null {
+  if (!specs) return null;
+  const value = Object.values(specs)[0];
+  if (!value) return null;
+  return value.length > 22 ? `${value.slice(0, 22)}…` : value;
+}
+
 export function ProductThumb({
   productId,
   size = "md",
@@ -67,19 +78,30 @@ export function ProductThumb({
   const product = productById(productId);
   const categoryId = product?.categoryId ?? "cat-stage";
   const spec = SIZE[size];
+  const label = size === "tile" || size === "hero" ? headlineSpec(product?.specs) : null;
 
   return (
     <span
       aria-hidden="true"
       title={categoryById(categoryId)?.name}
       className={cn(
-        "grid shrink-0 place-items-center",
+        "grid shrink-0 place-content-center justify-items-center gap-2",
         spec.box,
         categoryTone(categoryId),
         className,
       )}
     >
       {categoryGlyph(categoryId, spec.icon)}
+      {label ? (
+        <span
+          className={cn(
+            "px-3 text-center font-medium leading-tight opacity-80",
+            size === "hero" ? "text-base" : "text-xs",
+          )}
+        >
+          {label}
+        </span>
+      ) : null}
     </span>
   );
 }
