@@ -276,8 +276,10 @@ export async function advanceOrder(orderId: string, to: OrderStatus): Promise<Mu
     if (Date.now() > new Date(order.endsAt).getTime()) {
       const assessment = assessLateFee(order, lateFeeRules, data.products, new Date());
       if (assessment) {
+        // Replace any fee already recorded rather than stacking a second one on
+        // top, and reuse the invoice id so a re-assessment updates in place.
         updated.lateFeeTotal = assessment.amount;
-        updated.total = round2(order.total + assessment.amount);
+        updated.total = round2(order.total - order.lateFeeTotal + assessment.amount);
         changes.invoices = [
           {
             id: `i-${order.id}-late_fee`,

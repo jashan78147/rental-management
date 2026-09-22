@@ -129,8 +129,10 @@ export function buildSeedDataset(): Dataset {
       lines,
     };
 
-    // Late fee on the rows that came back past their due time.
-    if (seed.returnedLateHours) {
+    // Late fee only on rows that actually came back late. An overdue rental
+    // still with the customer has a projected fee, not a billed one, so it must
+    // not carry a lateFeeTotal or an invoice until it is checked in.
+    if (seed.returnedLateHours && seed.status === "returned") {
       const returnedAt = new Date(
         new Date(endsAt).getTime() + seed.returnedLateHours * 3_600_000,
       );
@@ -248,7 +250,7 @@ export function buildSeedDataset(): Dataset {
 
     if (order.lateFeeTotal > 0) {
       invoices.push({
-        id: `i-${orderId}-late`,
+        id: `i-${orderId}-late_fee`,
         orderId,
         number: `INV-${seed.reference.slice(3)}-L`,
         kind: "late_fee",
