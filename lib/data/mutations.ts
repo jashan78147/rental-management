@@ -43,12 +43,14 @@ export async function createOrder(input: {
   const { items, startsAt, endsAt, customerId, notes } = input;
 
   if (items.length === 0) return { ok: false, error: "The quotation has no items on it." };
-  if (!profileById(customerId)) return { ok: false, error: "Unknown customer." };
   if (new Date(endsAt) <= new Date(startsAt)) {
     return { ok: false, error: "The return time has to be after the pickup time." };
   }
 
+  // loadDataset warms the people registry, so this resolves self-registered
+  // customers as well as the seeded ones.
   const data = await loadDataset();
+  if (!profileById(customerId)) return { ok: false, error: "Unknown customer." };
   const quote = buildQuote({ items, startsAt, endsAt, customerId, reservations: data.reservations });
 
   const shortages = quote.lines

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { currentAccount } from "@/lib/auth/users";
 import { createOrder } from "@/lib/data/mutations";
 
 export const runtime = "nodejs";
@@ -11,11 +12,17 @@ const Body = z.object({
     .max(40),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
-  customerId: z.string(),
+  /** Honoured for the desk only. A customer always bills to themselves. */
+  customerId: z.string().optional(),
   notes: z.string().max(600).optional(),
 });
 
 export async function POST(request: Request) {
+  const account = await currentAccount();
+  if (!account) {
+    return NextResponse.json({ error: "Sign in to send a quotation." }, { status: 401 });
+  }
+
   let parsed;
   try {
     parsed = Body.safeParse(await request.json());
@@ -25,12 +32,18 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Add at least one item and pick a customer before sending the quotation." },
+      { error: "Add at least one item before sending the quotation." },
       { status: 400 },
     );
   }
 
-  const result = await createOrder(parsed.data);
+  // Whose booking this is comes from the session, never from the request body.
+  // The desk may name a customer; anyone else gets their own id regardless of
+  // what they sent.
+  const customerId =
+    account.role === "end_user" ? (parsed.data.customerId ?? account.id) : account.id;
+
+  const result = await createOrder({ ...parsed.data, customerId });
 
   if (!result.ok) {
     return NextResponse.json(

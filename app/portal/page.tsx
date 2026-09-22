@@ -1,24 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
-import { CustomerSwitch } from "@/components/portal/customer-switch";
+import { SEGMENT_LABEL } from "@/lib/data/seed";
 import { Badge, ButtonLink, Card, EmptyState, Stat, StatusBadge } from "@/components/ui";
-import { profiles } from "@/lib/data/seed";
-import { profileById } from "@/lib/data/store";
+import { requireCustomer } from "@/lib/auth/viewer";
 import { loadDataset } from "@/lib/data/persist";
 import { durationLabel, fmtDateTime, money, relativeTime } from "@/lib/format";
-import { firstParam } from "@/lib/window";
 
 export const metadata: Metadata = { title: "My Rentals" };
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-const CUSTOMERS = profiles.filter((p) => p.role === "customer");
-
-export default async function PortalPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
-  const customerId = firstParam(params.as) ?? CUSTOMERS[0].id;
-  const customer = profileById(customerId) ?? CUSTOMERS[0];
+export default async function PortalPage() {
+  const customer = await requireCustomer("/portal");
 
   const store = await loadDataset();
   const orders = store.orders
@@ -51,7 +43,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
             {customer.fullName} , {customer.email}
           </p>
         </div>
-        <CustomerSwitch customers={CUSTOMERS} currentId={customer.id} />
+        <Badge tone="clay">{SEGMENT_LABEL[customer.segment]} rates</Badge>
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -123,7 +115,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <Link
-                              href={`/portal/orders/${order.id}?as=${customer.id}`}
+                              href={`/portal/orders/${order.id}`}
                               className="font-mono font-medium text-ink transition-colors hover:text-clay"
                             >
                               {order.reference}
@@ -150,7 +142,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
                             {money(order.total)}
                           </p>
                           <Link
-                            href={`/portal/orders/${order.id}?as=${customer.id}`}
+                            href={`/portal/orders/${order.id}`}
                             className="mt-1 inline-flex items-center gap-1 text-sm text-clay transition-colors hover:text-clay-hover"
                           >
                             {order.status === "quotation_sent" ? "Review and pay" : "View"}

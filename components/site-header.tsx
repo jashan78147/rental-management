@@ -2,17 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Moon, ShoppingBag, Sun } from "@phosphor-icons/react/dist/ssr";
 import { useCart } from "@/components/cart-provider";
-import { BRAND } from "@/lib/data/seed";
+import { BrandMark } from "@/components/brand-mark";
 import { cn } from "@/lib/format";
 
-const NAV = [
-  { href: "/catalog", label: "Catalog" },
-  { href: "/portal", label: "My Rentals" },
-  { href: "/console", label: "Operations" },
-];
+/**
+ * The desk and the portal are two sides of one counter, and nobody belongs on
+ * both. Showing a customer a link that only redirects them back is noise, so
+ * the nav follows the signed-in role: signed out sees the shop alone.
+ */
+function navFor(role: "operator" | "customer" | null) {
+  const nav = [{ href: "/catalog", label: "Catalog" }];
+  if (role === "operator") nav.push({ href: "/console", label: "Operations" });
+  else if (role === "customer") nav.push({ href: "/portal", label: "My Rentals" });
+  return nav;
+}
 
 function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
@@ -57,33 +63,32 @@ function ThemeToggle() {
   );
 }
 
-export function SiteHeader() {
+/** Routes that own the whole viewport and supply their own branding. */
+const BARE_ROUTES = ["/login", "/register"];
+
+export function SiteHeader({
+  accountSlot,
+  role = null,
+}: {
+  accountSlot?: ReactNode;
+  role?: "operator" | "customer" | null;
+}) {
   const pathname = usePathname();
   const { count, ready } = useCart();
+
+  if (BARE_ROUTES.some((route) => pathname.startsWith(route))) return null;
+
+  const nav = navFor(role);
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-sticky backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5 font-display text-lg font-semibold">
-          <span
-            aria-hidden="true"
-            className="grid h-8 w-8 place-items-center rounded-lg bg-clay text-on-clay"
-          >
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
-              <path d="M4 8.5 12 4l8 4.5v7L12 20l-8-4.5z" strokeLinejoin="round" />
-              <path d="M4 8.5 12 13l8-4.5M12 13v7" strokeLinejoin="round" />
-            </svg>
-          </span>
-          <span className="flex flex-col leading-none">
-            <span translate="no">{BRAND.name}</span>
-            <span className="mt-0.5 hidden text-[0.7rem] font-normal tracking-wide text-ink-faint sm:block">
-              Equipment hire
-            </span>
-          </span>
+        <Link href="/" className="shrink-0">
+          <BrandMark />
         </Link>
 
         <nav aria-label="Primary" className="ml-auto hidden items-center gap-1 md:flex">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
@@ -115,6 +120,7 @@ export function SiteHeader() {
               </span>
             ) : null}
           </Link>
+          {accountSlot}
         </div>
       </div>
 
@@ -122,7 +128,7 @@ export function SiteHeader() {
         aria-label="Primary mobile"
         className="flex items-center gap-1 overflow-x-auto border-t border-line px-4 py-2 md:hidden scrollbar-slim"
       >
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <Link

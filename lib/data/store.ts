@@ -21,6 +21,7 @@ import {
   profiles,
   settings,
 } from "./seed";
+import { personById } from "./people";
 
 export interface Dataset {
   products: Product[];
@@ -341,6 +342,10 @@ export function categoryById(id: string) {
   return categories.find((c) => c.id === id);
 }
 
+/**
+ * Seeded people and self-registered accounts alike. See lib/data/people.ts for
+ * why this is a synchronous lookup against a warmed registry.
+ */
 export function profileById(id: string) {
-  return profiles.find((p) => p.id === id);
+  return personById(id);
 }

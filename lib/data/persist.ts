@@ -8,6 +8,7 @@ import type {
   RentalOrder,
   Reservation,
 } from "@/lib/domain/types";
+import { hydratePeople } from "@/lib/auth/accounts";
 import { memoryDataset, type Dataset } from "./store";
 
 /**
@@ -26,8 +27,13 @@ export interface Changes {
 }
 
 export async function loadDataset(): Promise<Dataset> {
-  if (dbConfigured()) return loadFromDb();
-  return memoryDataset();
+  // Warm the people registry alongside the data, so any page rendering orders
+  // can name a self-registered customer without an await at the lookup.
+  const [data] = await Promise.all([
+    dbConfigured() ? loadFromDb() : Promise.resolve(memoryDataset()),
+    hydratePeople(),
+  ]);
+  return data;
 }
 
 function upsertInto<T extends { id: string }>(list: T[], items: T[]): void {

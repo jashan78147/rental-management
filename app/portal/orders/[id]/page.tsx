@@ -8,38 +8,39 @@ import { ArrowLeft, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
 import { ActionForm } from "@/components/console/action-form";
 import { Badge, Card, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { confirmOrderAction, payInvoiceAction } from "@/lib/actions";
+import { currentAccount } from "@/lib/auth/users";
+import { requireCustomer } from "@/lib/auth/viewer";
 import { pricelists, productById, profileById, settings } from "@/lib/data/store";
 import { loadDataset } from "@/lib/data/persist";
 import { UNIT_LABEL } from "@/lib/domain/pricing";
 import { durationLabel, fmtDateFull, fmtDateTime, money, relativeTime } from "@/lib/format";
-import { firstParam } from "@/lib/window";
 
 type Params = Promise<{ id: string }>;
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { id } = await params;
+  const viewer = await currentAccount();
   const store = await loadDataset();
   const order = store.orders.find((o) => o.id === id);
-  return { title: order ? order.reference : "Rental" };
+
+  // The title is rendered before the page body decides on the 404, so it has
+  // to apply the same ownership check or it leaks the reference.
+  const mine = order && viewer && order.customerId === viewer.id;
+  return { title: mine ? order.reference : "Rental" };
 }
 
-export default async function PortalOrderPage({
-  params,
-  searchParams,
-}: {
-  params: Params;
-  searchParams: SearchParams;
-}) {
+export default async function PortalOrderPage({ params }: { params: Params }) {
   const { id } = await params;
-  const search = await searchParams;
+  const viewer = await requireCustomer(`/portal/orders/${id}`);
 
   const store = await loadDataset();
   const order = store.orders.find((o) => o.id === id);
-  if (!order) notFound();
+
+  // Someone else's booking is not "not allowed", it simply is not theirs to
+  // see. A 404 leaks nothing about which order ids exist.
+  if (!order || order.customerId !== viewer.id) notFound();
 
   const customer = profileById(order.customerId);
-  const viewingAs = firstParam(search.as) ?? order.customerId;
   const pricelist = pricelists.find((p) => p.id === order.pricelistId);
 
   const invoices = store.invoices
@@ -58,7 +59,7 @@ export default async function PortalOrderPage({
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
       <Link
-        href={`/portal?as=${viewingAs}`}
+        href="/portal"
         className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-clay"
       >
         <ArrowLeft size={15} weight="bold" aria-hidden="true" />

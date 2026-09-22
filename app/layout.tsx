@@ -3,7 +3,10 @@ import { Bricolage_Grotesque, JetBrains_Mono, Karla } from "next/font/google";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { CartProvider } from "@/components/cart-provider";
 import { SiteHeader } from "@/components/site-header";
+import { AccountMenu } from "@/components/account-menu";
 import { SiteFooter } from "@/components/site-footer";
+import { FooterSlot } from "@/components/site-chrome";
+import { currentAccount } from "@/lib/auth/users";
 import { BRAND } from "@/lib/data/seed";
 import "./globals.css";
 
@@ -59,7 +62,9 @@ try {
 } catch (e) {}
 `;
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const account = await currentAccount();
+
   return (
     <html lang="en-IN" suppressHydrationWarning>
       <head>
@@ -76,9 +81,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <NuqsAdapter>
           <CartProvider>
-            <SiteHeader />
+            <SiteHeader
+              accountSlot={<AccountMenu />}
+              role={account ? (account.role === "end_user" ? "operator" : "customer") : null}
+            />
             <main id="main">{children}</main>
-            <SiteFooter />
+            <FooterSlot>
+              <SiteFooter />
+            </FooterSlot>
           </CartProvider>
         </NuqsAdapter>
       </body>

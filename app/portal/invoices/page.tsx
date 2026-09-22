@@ -3,25 +3,16 @@ import { paymentsConfigured } from "@/lib/payments/razorpay";
 import { PayButton } from "@/components/portal/pay-button";
 import Link from "next/link";
 import { ActionForm } from "@/components/console/action-form";
-import { CustomerSwitch } from "@/components/portal/customer-switch";
 import { Card, EmptyState, Stat, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { payInvoiceAction } from "@/lib/actions";
-import { profiles } from "@/lib/data/seed";
-import { profileById } from "@/lib/data/store";
+import { requireCustomer } from "@/lib/auth/viewer";
 import { loadDataset } from "@/lib/data/persist";
 import { fmtDateFull, money } from "@/lib/format";
-import { firstParam } from "@/lib/window";
 
 export const metadata: Metadata = { title: "Invoices" };
 
-type SearchParams = Promise<Record<string, string | string[] | undefined>>;
-
-const CUSTOMERS = profiles.filter((p) => p.role === "customer");
-
-export default async function PortalInvoicesPage({ searchParams }: { searchParams: SearchParams }) {
-  const params = await searchParams;
-  const customerId = firstParam(params.as) ?? CUSTOMERS[0].id;
-  const customer = profileById(customerId) ?? CUSTOMERS[0];
+export default async function PortalInvoicesPage() {
+  const customer = await requireCustomer("/portal/invoices");
 
   const store = await loadDataset();
   const orderIds = new Set(
@@ -48,7 +39,6 @@ export default async function PortalInvoicesPage({ searchParams }: { searchParam
           <h1 className="font-display text-3xl font-semibold">Invoices and payments</h1>
           <p className="mt-1 text-ink-soft">{customer.fullName}</p>
         </div>
-        <CustomerSwitch customers={CUSTOMERS} currentId={customer.id} />
       </header>
 
       <div className="grid gap-4 sm:grid-cols-3">
@@ -84,7 +74,7 @@ export default async function PortalInvoicesPage({ searchParams }: { searchParam
                         <>
                           {" for "}
                           <Link
-                            href={`/portal/orders/${order.id}?as=${customer.id}`}
+                            href={`/portal/orders/${order.id}`}
                             className="font-mono transition-colors hover:text-clay"
                           >
                             {order.reference}

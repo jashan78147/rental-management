@@ -282,6 +282,19 @@ p {
   }
 }
 
+/* A slow breath for the route loader: never fully fades, so it reads as
+   "working" rather than "blinking". */
+@keyframes breathe {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scale(0.94);
+  }
+}
+
 @keyframes marquee {
   from {
     transform: translate3d(0, 0, 0);
@@ -306,6 +319,11 @@ p {
 
 .animate-marquee {
   animation: marquee 34s linear infinite;
+}
+
+.animate-breathe {
+  animation: breathe 1600ms var(--ease-in-out) infinite;
+  will-change: transform, opacity;
 }
 
 /* Staggered entrance for grids and lists. */
@@ -341,6 +359,7 @@ p {
   .animate-fade,
   .animate-sweep,
   .animate-marquee,
+  .animate-breathe,
   .stagger > *,
   .reveal {
     animation: none !important;
