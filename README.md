@@ -57,18 +57,31 @@ and customers are invented; the mechanics are real.
   quote-to-order conversion, on-time return rate and the late-return list.
 - Every report exports as **PDF, XLSX or CSV** over the same period selector.
 
-**AI, in three places**
-1. **Kit builder** on the home page. Describe the job in plain language and Claude
-   assembles a bookable kit from live availability, including the power and
-   support most lists forget, and tells you what it still needs to know.
-2. **Cart suggestions.** What this specific order is missing, grounded in
-   co-rental history and current free units.
+**Recommendations, in three places**
+
+1. **Kit builder** on the home page. Describe the job in plain language and it
+   assembles a bookable kit from live availability, then tells you what it still
+   needs to know.
+2. **Cart suggestions.** What this specific order is missing, ranked by
+   co-rental affinity across past orders and filtered to units actually free.
 3. **Desk brief** on the console dashboard. Two sentences plus up to four things
    to act on before lunch, each naming a real reference, product or customer.
 
-Every AI surface is constrained to real product IDs and real availability, and
-every one degrades to a deterministic fallback when no API key is set, so the
-deployed app is never broken by a missing key.
+**Each one runs with no API key and no network.** The kit builder is a rule
+engine (`lib/ai/rules.ts`): it parses the brief into a structured shape
+(duration, job type, indoor or outdoor, headcount, camera count, mains power,
+night work, travel) and applies the dependency rules a rental desk applies by
+habit. Lights off-grid pull in a generator and distro. Cameras away from a wall
+socket pull in batteries. A live crew pulls in comms. Headcount sizes the PA,
+the seating and the decking. Power resolves last and is protected from
+truncation, so a kit can never quote lights with nothing to run them on. The
+cart panel is co-rental affinity, which is ordinary collaborative filtering over
+real order history.
+
+Setting `ANTHROPIC_API_KEY` upgrades all three to Claude Opus 5 with structured
+outputs, constrained to real product IDs and real free units. The interface is
+the same either way, and any API failure falls back to the rules rather than
+breaking the page. Nothing here needs a key to demo.
 
 ## Running it
 

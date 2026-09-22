@@ -135,8 +135,20 @@ export function KitFinder() {
           <Card className="animate-rise overflow-hidden">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line p-5">
               <div className="min-w-0">
-                <Badge tone={result.source === "claude" ? "clay" : "neutral"}>
-                  {result.source === "claude" ? "Read by Claude" : "Keyword match"}
+                <Badge
+                  tone={
+                    result.source === "claude"
+                      ? "clay"
+                      : result.source === "rules"
+                        ? "pine"
+                        : "neutral"
+                  }
+                >
+                  {result.source === "claude"
+                    ? "Read by Claude"
+                    : result.source === "rules"
+                      ? "Kit rules"
+                      : "Keyword match"}
                 </Badge>
                 <p className="mt-2 text-[0.95rem] text-ink">{result.understood}</p>
                 {result.suggestedDurationHours ? (

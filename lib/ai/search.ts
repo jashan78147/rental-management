@@ -3,6 +3,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { allProducts, categoryById, dataset, productById } from "@/lib/data/store";
 import { availableUnits } from "@/lib/domain/availability";
 import { AI_MODEL, aiClient, aiConfigured, describeAiError } from "./client";
+import { ruleBasedKit } from "./rules";
 
 export interface SearchPick {
   productId: string;
@@ -19,8 +20,43 @@ export interface SearchResult {
   suggestedDurationHours: number | null;
   picks: SearchPick[];
   missing: string[];
-  source: "claude" | "keyword";
+  source: "claude" | "rules" | "keyword";
   note?: string;
+}
+
+/**
+ * The no-key path. The rule engine reads the brief into a structured shape and
+ * applies the desk's dependency rules; keyword overlap is only a last resort
+ * for a brief too vague to infer anything from.
+ */
+function rulesResult(query: string, startsAt: string, endsAt: string): SearchResult {
+  const kit = ruleBasedKit(query, startsAt, endsAt);
+
+  if (kit.picks.length === 0) {
+    return {
+      understood: `Nothing specific to infer from that, so this is a plain keyword match.`,
+      suggestedDurationHours: null,
+      picks: keywordSearch(query, startsAt, endsAt),
+      missing: ["Name the kind of job, the rough size, and whether there is power on site."],
+      source: "keyword",
+    };
+  }
+
+  return {
+    understood: kit.understood,
+    suggestedDurationHours: kit.suggestedDurationHours,
+    picks: kit.picks.map((pick) => ({
+      productId: pick.product.id,
+      name: pick.product.name,
+      slug: pick.product.slug,
+      imageUrl: pick.product.imageUrl,
+      quantity: pick.quantity,
+      why: pick.why,
+      available: pick.available,
+    })),
+    missing: kit.missing,
+    source: "rules",
+  };
 }
 
 const SearchSchema = z.object({
@@ -96,17 +132,7 @@ export async function searchKit(args: {
 }): Promise<SearchResult> {
   const { query, startsAt, endsAt } = args;
 
-  if (!aiConfigured()) {
-    const picks = keywordSearch(query, startsAt, endsAt);
-    return {
-      understood: `Keyword match on "${query}".`,
-      suggestedDurationHours: null,
-      picks,
-      missing: [],
-      source: "keyword",
-      note: "Set ANTHROPIC_API_KEY to read the brief instead of matching words.",
-    };
-  }
+  if (!aiConfigured()) return rulesResult(query, startsAt, endsAt);
 
   try {
     const response = await aiClient().messages.parse({
@@ -158,13 +184,6 @@ export async function searchKit(args: {
       source: "claude",
     };
   } catch (error) {
-    return {
-      understood: `Keyword match on "${query}".`,
-      suggestedDurationHours: null,
-      picks: keywordSearch(query, startsAt, endsAt),
-      missing: [],
-      source: "keyword",
-      note: describeAiError(error),
-    };
+    return { ...rulesResult(query, startsAt, endsAt), note: describeAiError(error) };
   }
 }

@@ -111,8 +111,10 @@ export default function HomePage() {
               Tell us what you are shooting. We will build the kit.
             </h2>
             <p className="mt-3 text-ink-soft">
-              Claude reads the brief against live availability and puts together something that
-              would actually work on the day, including the power and support most lists forget.
+              The kit builder reads your brief against live availability and puts together
+              something that would actually work on the day, including the power and support most
+              lists forget. Lights running off-grid get a generator. Cameras away from a socket get
+              batteries.
             </p>
           </div>
           <KitFinder />
