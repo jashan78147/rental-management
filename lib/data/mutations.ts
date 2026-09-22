@@ -8,31 +8,24 @@ import type {
   Invoice,
   OrderLine,
   OrderStatus,
+  Payment,
   RentalOrder,
+  Reservation,
 } from "@/lib/domain/types";
-import { dataset, lateFeeRules, notificationRules, profileById, settings } from "./store";
+import { applyChanges, loadDataset, type Changes } from "./persist";
+import { lateFeeRules, profileById, settings } from "./store";
 
-function nextReference(): string {
-  const now = new Date();
-  const stamp = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const serial = dataset().orders.length + 160;
-  return `RO-${stamp}-${String(serial).padStart(4, "0")}`;
-}
-
-export interface CreateOrderInput {
-  items: CartItem[];
-  startsAt: string;
-  endsAt: string;
-  customerId: string;
-  notes?: string;
-  invoiceMode?: "full_upfront" | "deposit_then_balance";
-}
-
-export interface CreateOrderResult {
+export interface MutationResult {
   ok: boolean;
   order?: RentalOrder;
   error?: string;
   shortages?: { productId: string; requested: number; available: number }[];
+}
+
+function nextReference(existing: number): string {
+  const now = new Date();
+  const stamp = `${String(now.getFullYear()).slice(2)}${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return `RO-${stamp}-${String(existing + 160).padStart(4, "0")}`;
 }
 
 /**
@@ -40,7 +33,13 @@ export interface CreateOrderResult {
  * than trusting whatever the browser last saw, so two people racing for the
  * last generator cannot both succeed.
  */
-export function createOrder(input: CreateOrderInput): CreateOrderResult {
+export async function createOrder(input: {
+  items: CartItem[];
+  startsAt: string;
+  endsAt: string;
+  customerId: string;
+  notes?: string;
+}): Promise<MutationResult> {
   const { items, startsAt, endsAt, customerId, notes } = input;
 
   if (items.length === 0) return { ok: false, error: "The quotation has no items on it." };
@@ -49,7 +48,8 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
     return { ok: false, error: "The return time has to be after the pickup time." };
   }
 
-  const quote = buildQuote({ items, startsAt, endsAt, customerId });
+  const data = await loadDataset();
+  const quote = buildQuote({ items, startsAt, endsAt, customerId, reservations: data.reservations });
 
   const shortages = quote.lines
     .filter((line) => line.shortBy > 0)
@@ -60,16 +60,10 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
     }));
 
   if (shortages.length > 0) {
-    return {
-      ok: false,
-      error: "Some items were taken while this quotation was open.",
-      shortages,
-    };
+    return { ok: false, error: "Some items were taken while this quotation was open.", shortages };
   }
 
-  const store = dataset();
   const orderId = `o-${Date.now().toString(36)}`;
-
   const lines: OrderLine[] = quote.lines.map((line, index) => ({
     id: `${orderId}-l${index + 1}`,
     orderId,
@@ -85,7 +79,7 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
 
   const order: RentalOrder = {
     id: orderId,
-    reference: nextReference(),
+    reference: nextReference(data.orders.length),
     customerId,
     status: "quotation",
     startsAt,
@@ -102,7 +96,7 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
     lines,
   };
 
-  store.orders.unshift(order);
+  await applyChanges({ orders: [order] });
   return { ok: true, order };
 }
 
@@ -111,12 +105,12 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
  * written, pickup and return documents are raised, the invoice schedule is
  * created and the return reminders are queued.
  */
-export function confirmOrder(
+export async function confirmOrder(
   orderId: string,
   invoiceMode: "full_upfront" | "deposit_then_balance" = "deposit_then_balance",
-): CreateOrderResult {
-  const store = dataset();
-  const order = store.orders.find((o) => o.id === orderId);
+): Promise<MutationResult> {
+  const data = await loadDataset();
+  const order = data.orders.find((o) => o.id === orderId);
   if (!order) return { ok: false, error: "Order not found." };
   if (order.status !== "quotation" && order.status !== "quotation_sent") {
     return { ok: false, error: `This order is already ${order.status.replace(/_/g, " ")}.` };
@@ -127,6 +121,7 @@ export function confirmOrder(
     startsAt: order.startsAt,
     endsAt: order.endsAt,
     customerId: order.customerId,
+    reservations: data.reservations,
     ignoreOrderId: order.id,
   });
 
@@ -142,67 +137,63 @@ export function confirmOrder(
     return { ok: false, error: "Stock was committed elsewhere before this was confirmed.", shortages };
   }
 
-  order.status = "confirmed";
-  order.confirmedAt = new Date().toISOString();
-
-  order.lines.forEach((line, index) => {
-    store.reservations.push({
-      id: `r-${order.id}-${index + 1}`,
-      orderId: order.id,
-      productId: line.productId,
-      quantity: line.quantity,
-      startsAt: order.startsAt,
-      endsAt: order.endsAt,
-      status: "reserved",
-    });
-  });
+  const confirmed: RentalOrder = {
+    ...order,
+    status: "confirmed",
+    confirmedAt: new Date().toISOString(),
+  };
 
   const customer = profileById(order.customerId);
 
-  const pickup: Delivery = {
-    id: `d-${order.id}-out`,
+  const reservations: Reservation[] = order.lines.map((line, index) => ({
+    id: `r-${order.id}-${index + 1}`,
     orderId: order.id,
-    kind: "pickup",
-    documentNo: `PU-${order.reference.slice(3)}`,
-    scheduledAt: new Date(new Date(order.startsAt).getTime() - 2 * 3_600_000).toISOString(),
-    status: "scheduled",
-    address: `${customer?.city ?? "Site"} address on file`,
-    handler: "Unassigned",
-  };
+    productId: line.productId,
+    quantity: line.quantity,
+    startsAt: order.startsAt,
+    endsAt: order.endsAt,
+    status: "reserved",
+  }));
 
-  const dropoff: Delivery = {
-    id: `d-${order.id}-in`,
-    orderId: order.id,
-    kind: "return",
-    documentNo: `RT-${order.reference.slice(3)}`,
-    scheduledAt: order.endsAt,
-    status: "scheduled",
-    address: `${customer?.city ?? "Site"} address on file`,
-    handler: "Unassigned",
-  };
+  const deliveries: Delivery[] = [
+    {
+      id: `d-${order.id}-out`,
+      orderId: order.id,
+      kind: "pickup",
+      documentNo: `PU-${order.reference.slice(3)}`,
+      scheduledAt: new Date(new Date(order.startsAt).getTime() - 2 * 3_600_000).toISOString(),
+      status: "scheduled",
+      address: `${customer?.city ?? "Site"} address on file`,
+      handler: "Unassigned",
+    },
+    {
+      id: `d-${order.id}-in`,
+      orderId: order.id,
+      kind: "return",
+      documentNo: `RT-${order.reference.slice(3)}`,
+      scheduledAt: order.endsAt,
+      status: "scheduled",
+      address: `${customer?.city ?? "Site"} address on file`,
+      handler: "Unassigned",
+    },
+  ];
 
-  store.deliveries.push(pickup, dropoff);
-
-  for (const plan of buildInvoicePlan(order, invoiceMode, settings.depositPercent)) {
-    const invoice: Invoice = {
+  const invoices: Invoice[] = buildInvoicePlan(confirmed, invoiceMode, settings.depositPercent).map(
+    (plan) => ({
       id: `i-${order.id}-${plan.kind}`,
       orderId: order.id,
       number: `INV-${order.reference.slice(3)}-${plan.kind[0].toUpperCase()}`,
       kind: plan.kind,
       amount: plan.amount,
-      status: "sent",
+      status: "sent" as const,
       issuedAt: new Date().toISOString(),
       dueDate: plan.dueDate,
-    };
-    store.invoices.push(invoice);
-  }
+    }),
+  );
 
-  for (const rule of notificationRules.filter((r) => r.isActive && r.event === "before_return")) {
-    const scheduledFor = new Date(
-      new Date(order.endsAt).getTime() - rule.leadDays * 86_400_000,
-    ).toISOString();
-
-    const notification: AppNotification = {
+  const notifications: AppNotification[] = data.notificationRules
+    .filter((rule) => rule.isActive && rule.event === "before_return")
+    .map((rule) => ({
       id: `n-${order.id}-${rule.id}`,
       ruleId: rule.id,
       orderId: order.id,
@@ -216,20 +207,20 @@ export function confirmOrder(
         rule.audience === "customer"
           ? `Your rental ${order.reference} returns on ${new Date(order.endsAt).toLocaleString("en-IN")}. Use the portal if you need to extend it.`
           : `Collection run for ${order.reference} (${customer?.fullName}). ${order.lines.length} line items to check in.`,
-      scheduledFor,
-      status: "scheduled",
-    };
+      scheduledFor: new Date(
+        new Date(order.endsAt).getTime() - rule.leadDays * 86_400_000,
+      ).toISOString(),
+      status: "scheduled" as const,
+    }));
 
-    store.notifications.push(notification);
-  }
-
-  return { ok: true, order };
+  await applyChanges({ orders: [confirmed], reservations, deliveries, invoices, notifications });
+  return { ok: true, order: confirmed };
 }
 
 /** Move an order along the pickup and return track. */
-export function advanceOrder(orderId: string, to: OrderStatus): CreateOrderResult {
-  const store = dataset();
-  const order = store.orders.find((o) => o.id === orderId);
+export async function advanceOrder(orderId: string, to: OrderStatus): Promise<MutationResult> {
+  const data = await loadDataset();
+  const order = data.orders.find((o) => o.id === orderId);
   if (!order) return { ok: false, error: "Order not found." };
 
   const allowed: Record<string, OrderStatus[]> = {
@@ -249,98 +240,144 @@ export function advanceOrder(orderId: string, to: OrderStatus): CreateOrderResul
   }
 
   const now = new Date().toISOString();
+  const changes: Changes = {};
+  const updated: RentalOrder = { ...order, status: to };
+
+  const ownReservations = data.reservations.filter((r) => r.orderId === orderId);
+  const ownDeliveries = data.deliveries.filter((d) => d.orderId === orderId);
+  const ownInvoices = data.invoices.filter((i) => i.orderId === orderId);
 
   if (to === "picked_up") {
-    for (const reservation of store.reservations.filter((r) => r.orderId === orderId)) {
-      reservation.status = "out";
-    }
-    const pickup = store.deliveries.find((d) => d.orderId === orderId && d.kind === "pickup");
-    if (pickup) {
-      pickup.status = "done";
-      pickup.completedAt = now;
-    }
-    for (const invoice of store.invoices.filter((i) => i.orderId === orderId && i.status === "sent")) {
-      invoice.status = "paid";
-      invoice.paidAt = now;
-      store.payments.push({
-        id: `pay-${invoice.id}`,
-        invoiceId: invoice.id,
-        amount: invoice.amount,
-        gateway: settings.gateway,
-        gatewayPaymentId: `pi_${invoice.id}`,
-        status: "succeeded",
-        paidAt: now,
-      });
-    }
+    changes.reservations = ownReservations.map((r) => ({ ...r, status: "out" as const }));
+
+    const pickup = ownDeliveries.find((d) => d.kind === "pickup");
+    if (pickup) changes.deliveries = [{ ...pickup, status: "done", completedAt: now }];
+
+    const unpaid = ownInvoices.filter((i) => i.status === "sent" || i.status === "draft");
+    changes.invoices = unpaid.map((i) => ({ ...i, status: "paid" as const, paidAt: now }));
+    changes.payments = unpaid.map<Payment>((invoice) => ({
+      id: `pay-${invoice.id}`,
+      invoiceId: invoice.id,
+      amount: invoice.amount,
+      gateway: settings.gateway,
+      gatewayPaymentId: `pi_${invoice.id}`,
+      status: "succeeded",
+      paidAt: now,
+    }));
   }
 
   if (to === "returned") {
-    for (const reservation of store.reservations.filter((r) => r.orderId === orderId)) {
-      reservation.status = "returned";
-    }
-    const dropoff = store.deliveries.find((d) => d.orderId === orderId && d.kind === "return");
-    if (dropoff) {
-      dropoff.status = "done";
-      dropoff.completedAt = now;
-    }
+    changes.reservations = ownReservations.map((r) => ({ ...r, status: "returned" as const }));
+
+    const dropoff = ownDeliveries.find((d) => d.kind === "return");
+    if (dropoff) changes.deliveries = [{ ...dropoff, status: "done", completedAt: now }];
 
     // Anything past the due time gets priced against the late fee rules.
-    const overdueHours = (Date.now() - new Date(order.endsAt).getTime()) / 3_600_000;
-    if (overdueHours > 0) {
-      const assessment = assessLateFee(order, lateFeeRules, store.products, new Date());
+    if (Date.now() > new Date(order.endsAt).getTime()) {
+      const assessment = assessLateFee(order, lateFeeRules, data.products, new Date());
       if (assessment) {
-        order.lateFeeTotal = assessment.amount;
-        order.total = round2(order.total + assessment.amount);
-        store.invoices.push({
-          id: `i-${order.id}-late`,
-          orderId: order.id,
-          number: `INV-${order.reference.slice(3)}-L`,
-          kind: "late_fee",
-          amount: assessment.amount,
-          status: "sent",
-          issuedAt: now,
-          dueDate: now.slice(0, 10),
-        });
+        updated.lateFeeTotal = assessment.amount;
+        updated.total = round2(order.total + assessment.amount);
+        changes.invoices = [
+          {
+            id: `i-${order.id}-late_fee`,
+            orderId: order.id,
+            number: `INV-${order.reference.slice(3)}-L`,
+            kind: "late_fee",
+            amount: assessment.amount,
+            status: "sent",
+            issuedAt: now,
+            dueDate: now.slice(0, 10),
+          },
+        ];
       }
     }
   }
 
   if (to === "cancelled") {
-    for (const reservation of store.reservations.filter((r) => r.orderId === orderId)) {
-      reservation.status = "released";
-    }
-    for (const delivery of store.deliveries.filter((d) => d.orderId === orderId)) {
-      if (delivery.status !== "done") delivery.status = "cancelled";
-    }
-    for (const invoice of store.invoices.filter((i) => i.orderId === orderId && i.status !== "paid")) {
-      invoice.status = "void";
-    }
+    changes.reservations = ownReservations.map((r) => ({ ...r, status: "released" as const }));
+    changes.deliveries = ownDeliveries
+      .filter((d) => d.status !== "done")
+      .map((d) => ({ ...d, status: "cancelled" as const }));
+    changes.invoices = ownInvoices
+      .filter((i) => i.status !== "paid")
+      .map((i) => ({ ...i, status: "void" as const }));
   }
 
-  order.status = to;
-  return { ok: true, order };
+  changes.orders = [updated];
+  await applyChanges(changes);
+  return { ok: true, order: updated };
 }
 
 /** Record a gateway payment against an invoice. */
-export function payInvoice(invoiceId: string, gatewayPaymentId: string): CreateOrderResult {
-  const store = dataset();
-  const invoice = store.invoices.find((i) => i.id === invoiceId);
+export async function payInvoice(
+  invoiceId: string,
+  gatewayPaymentId: string,
+): Promise<MutationResult> {
+  const data = await loadDataset();
+  const invoice = data.invoices.find((i) => i.id === invoiceId);
   if (!invoice) return { ok: false, error: "Invoice not found." };
   if (invoice.status === "paid") return { ok: false, error: "That invoice is already paid." };
 
   const now = new Date().toISOString();
-  invoice.status = "paid";
-  invoice.paidAt = now;
 
-  store.payments.push({
-    id: `pay-${invoice.id}-${Date.now().toString(36)}`,
-    invoiceId: invoice.id,
-    amount: invoice.amount,
-    gateway: settings.gateway,
-    gatewayPaymentId,
-    status: "succeeded",
-    paidAt: now,
+  await applyChanges({
+    invoices: [{ ...invoice, status: "paid", paidAt: now }],
+    payments: [
+      {
+        id: `pay-${invoice.id}-${Date.now().toString(36)}`,
+        invoiceId: invoice.id,
+        amount: invoice.amount,
+        gateway: settings.gateway,
+        gatewayPaymentId,
+        status: "succeeded",
+        paidAt: now,
+      },
+    ],
   });
 
-  return { ok: true, order: store.orders.find((o) => o.id === invoice.orderId) };
+  return { ok: true, order: data.orders.find((o) => o.id === invoice.orderId) };
+}
+
+/** Mark a queued reminder as sent. */
+export async function sendNotification(id: string): Promise<MutationResult & { audience?: string }> {
+  const data = await loadDataset();
+  const notification = data.notifications.find((n) => n.id === id);
+  if (!notification) return { ok: false, error: "Reminder not found." };
+  if (notification.sentAt) return { ok: false, error: "That reminder has already gone out." };
+
+  const now = new Date().toISOString();
+  await applyChanges({ notifications: [{ ...notification, sentAt: now, status: "sent" }] });
+  return { ok: true, audience: notification.audience };
+}
+
+/**
+ * Change how many days before a return a reminder fires. Queued reminders that
+ * have not gone out yet are rescheduled so the new lead time takes effect now
+ * rather than only on the next booking.
+ */
+export async function updateReminderRule(
+  ruleId: string,
+  leadDays: number,
+  isActive: boolean,
+): Promise<MutationResult & { rescheduled?: number }> {
+  const data = await loadDataset();
+  const rule = data.notificationRules.find((r) => r.id === ruleId);
+  if (!rule) return { ok: false, error: "Reminder rule not found." };
+
+  const notifications: AppNotification[] = [];
+  for (const notification of data.notifications) {
+    if (notification.ruleId !== ruleId || notification.sentAt) continue;
+    const order = data.orders.find((o) => o.id === notification.orderId);
+    if (!order) continue;
+    notifications.push({
+      ...notification,
+      scheduledFor: new Date(
+        new Date(order.endsAt).getTime() - leadDays * 86_400_000,
+      ).toISOString(),
+    });
+  }
+
+  await applyChanges({ reminderRules: [{ id: ruleId, leadDays, isActive }], notifications });
+  return { ok: true, rescheduled: notifications.length };
 }

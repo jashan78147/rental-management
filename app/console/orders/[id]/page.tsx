@@ -10,7 +10,8 @@ import {
   payInvoiceAction,
   sendNotificationAction,
 } from "@/lib/actions";
-import { dataset, lateFeeRules, pricelists, productById, profileById } from "@/lib/data/store";
+import { lateFeeRules, pricelists, productById, profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { assessLateFee } from "@/lib/domain/fees";
 import { UNIT_LABEL } from "@/lib/domain/pricing";
 import { SEGMENT_LABEL } from "@/lib/data/seed";
@@ -20,13 +21,14 @@ type Params = Promise<{ id: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { id } = await params;
-  const order = dataset().orders.find((o) => o.id === id);
+  const store = await loadDataset();
+  const order = store.orders.find((o) => o.id === id);
   return { title: order ? order.reference : "Order" };
 }
 
 export default async function ConsoleOrderPage({ params }: { params: Params }) {
   const { id } = await params;
-  const store = dataset();
+  const store = await loadDataset();
   const order = store.orders.find((o) => o.id === id);
   if (!order) notFound();
 

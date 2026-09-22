@@ -5,6 +5,7 @@ import { RateLadder, type LadderProduct } from "@/components/marketing/rate-ladd
 import { Badge, ButtonLink, Card, SectionHeading } from "@/components/ui";
 import { BRAND, categories, products } from "@/lib/data/seed";
 import { headline } from "@/lib/domain/reports";
+import { loadDataset } from "@/lib/data/persist";
 import { money, moneyCompact } from "@/lib/format";
 
 const LADDER_PRODUCTS: LadderProduct[] = ["p-fx6", "p-600d", "p-deck", "p-genset"]
@@ -33,8 +34,8 @@ const STAGES = [
   },
 ];
 
-export default function HomePage() {
-  const stats = headline("90d");
+export default async function HomePage() {
+  const stats = headline(await loadDataset(), "90d");
   const featured = ["p-fx6", "p-600d", "p-pa", "p-genset", "p-chairs", "p-komodo", "p-tubes", "p-deck"]
     .map((id) => products.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));

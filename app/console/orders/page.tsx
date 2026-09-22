@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Card, EmptyState, StatusBadge } from "@/components/ui";
-import { dataset, profileById } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import type { OrderStatus } from "@/lib/domain/types";
 import { cn, durationLabel, fmtDateFull, money } from "@/lib/format";
 import { firstParam } from "@/lib/window";
@@ -24,8 +25,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Searc
   const requested = firstParam(params.status) ?? "all";
   const filter = FILTERS.find((f) => f.key === requested) ?? FILTERS[0];
 
-  const orders = dataset()
-    .orders.filter((order) => filter.match.length === 0 || filter.match.includes(order.status))
+  const store = await loadDataset();
+  const orders = store.orders
+    .filter((order) => filter.match.length === 0 || filter.match.includes(order.status))
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());
 
   return (
@@ -41,8 +43,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Searc
         {FILTERS.map((option) => {
           const count =
             option.match.length === 0
-              ? dataset().orders.length
-              : dataset().orders.filter((o) => option.match.includes(o.status)).length;
+              ? store.orders.length
+              : store.orders.filter((o) => option.match.includes(o.status)).length;
 
           return (
             <Link

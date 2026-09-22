@@ -8,7 +8,8 @@ import { WindowPicker } from "@/components/shop/window-picker";
 import { Badge, Card, SectionHeading } from "@/components/ui";
 import { affinityRecommend } from "@/lib/ai/recommend";
 import { products } from "@/lib/data/seed";
-import { categoryById, dataset, productBySlug } from "@/lib/data/store";
+import { categoryById, productBySlug } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { availableUnits, dailyLoad, nextFreeWindow } from "@/lib/domain/availability";
 import { cheapestChunks, UNIT_LABEL } from "@/lib/domain/pricing";
 import type { DurationUnit, PricelistRule } from "@/lib/domain/types";
@@ -39,7 +40,8 @@ export default async function ProductPage({
 
   const search = await searchParams;
   const { startsAt, endsAt } = resolveWindow(search);
-  const { reservations } = dataset();
+  const store = await loadDataset();
+  const { reservations } = store;
 
   const rates = products.find((p) => p.id === product.id)?.rates ?? {};
   const available = availableUnits(product, reservations, startsAt, endsAt);
@@ -65,7 +67,7 @@ export default async function ProductPage({
   const alternative =
     available <= 0 ? nextFreeWindow(product, reservations, 1, startsAt, hours) : null;
 
-  const related = affinityRecommend([product.id], startsAt, endsAt, 3);
+  const related = affinityRecommend(store, [product.id], startsAt, endsAt, 3);
   const category = categoryById(product.categoryId);
 
   return (

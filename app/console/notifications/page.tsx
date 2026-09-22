@@ -4,7 +4,8 @@ import { ActionForm } from "@/components/console/action-form";
 import { ReminderRuleForm } from "@/components/console/reminder-rule-form";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { sendNotificationAction } from "@/lib/actions";
-import { dataset, notificationRules, profileById } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { fmtDateTime, relativeTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Reminders" };
@@ -15,8 +16,9 @@ const EVENT_LABEL: Record<string, string> = {
   overdue: "Once overdue",
 };
 
-export default function NotificationsPage() {
-  const store = dataset();
+export default async function NotificationsPage() {
+  const store = await loadDataset();
+  const notificationRules = store.notificationRules;
 
   const queue = store.notifications
     .slice()

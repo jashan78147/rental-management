@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ActionForm } from "@/components/console/action-form";
 import { advanceOrderAction } from "@/lib/actions";
 import { Badge, Card, EmptyState, StatusBadge } from "@/components/ui";
-import { dataset, productById, profileById } from "@/lib/data/store";
+import { productById, profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { fmtDateFull, fmtTime, money, relativeTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Collections" };
@@ -14,8 +15,8 @@ const DAY_HEADING = new Intl.DateTimeFormat("en-IN", {
   month: "long",
 });
 
-export default function SchedulePage() {
-  const store = dataset();
+export default async function SchedulePage() {
+  const store = await loadDataset();
   const now = Date.now();
 
   const movements = store.deliveries

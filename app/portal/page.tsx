@@ -4,7 +4,8 @@ import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { CustomerSwitch } from "@/components/portal/customer-switch";
 import { Badge, ButtonLink, Card, EmptyState, Stat, StatusBadge } from "@/components/ui";
 import { profiles } from "@/lib/data/seed";
-import { dataset, profileById } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { durationLabel, fmtDateTime, money, relativeTime } from "@/lib/format";
 import { firstParam } from "@/lib/window";
 
@@ -19,7 +20,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Searc
   const customerId = firstParam(params.as) ?? CUSTOMERS[0].id;
   const customer = profileById(customerId) ?? CUSTOMERS[0];
 
-  const store = dataset();
+  const store = await loadDataset();
   const orders = store.orders
     .filter((o) => o.customerId === customer.id)
     .sort((a, b) => new Date(b.startsAt).getTime() - new Date(a.startsAt).getTime());

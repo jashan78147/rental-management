@@ -1,4 +1,5 @@
-import { categoryById, dataset, productById, profileById } from "@/lib/data/store";
+import type { Dataset } from "@/lib/data/store";
+import { categoryById, productById, profileById } from "@/lib/data/store";
 import { round2 } from "./pricing";
 import type { OrderStatus, RentalOrder } from "./types";
 
@@ -17,9 +18,13 @@ export function periodDays(key: PeriodKey): number {
   return PERIODS.find((p) => p.key === key)?.days ?? 90;
 }
 
-export function ordersInPeriod(key: PeriodKey, now: Date = new Date()): RentalOrder[] {
+export function ordersInPeriod(
+  store: Dataset,
+  key: PeriodKey,
+  now: Date = new Date(),
+): RentalOrder[] {
   const cutoff = now.getTime() - periodDays(key) * 86_400_000;
-  return dataset().orders.filter((o) => new Date(o.startsAt).getTime() >= cutoff);
+  return store.orders.filter((o) => new Date(o.startsAt).getTime() >= cutoff);
 }
 
 export interface Headline {
@@ -36,8 +41,8 @@ export interface Headline {
   onTimeRate: number;
 }
 
-export function headline(key: PeriodKey, now: Date = new Date()): Headline {
-  const orders = ordersInPeriod(key, now);
+export function headline(store: Dataset, key: PeriodKey, now: Date = new Date()): Headline {
+  const orders = ordersInPeriod(store, key, now);
   const booked = orders.filter((o) => REVENUE_STATUSES.includes(o.status));
   const quotations = orders.filter(
     (o) => o.status === "quotation" || o.status === "quotation_sent",
@@ -46,8 +51,7 @@ export function headline(key: PeriodKey, now: Date = new Date()): Headline {
   const revenue = round2(booked.reduce((sum, o) => sum + o.total, 0));
   const lateFees = round2(booked.reduce((sum, o) => sum + o.lateFeeTotal, 0));
 
-  const { deliveries } = dataset();
-  const returnDocs = deliveries.filter((d) => d.kind === "return" && d.status === "done");
+  const returnDocs = store.deliveries.filter((d) => d.kind === "return" && d.status === "done");
   const onTime = returnDocs.filter(
     (d) => !d.completedAt || new Date(d.completedAt) <= new Date(d.scheduledAt),
   ).length;
@@ -64,7 +68,7 @@ export function headline(key: PeriodKey, now: Date = new Date()): Headline {
   const soldByProduct = new Map<string, number>();
   let soldUnitDays = 0;
 
-  for (const reservation of dataset().reservations) {
+  for (const reservation of store.reservations) {
     if (reservation.status === "released") continue;
     const from = Math.max(new Date(reservation.startsAt).getTime(), windowStart);
     const to = Math.min(new Date(reservation.endsAt).getTime(), windowEnd);
@@ -78,12 +82,12 @@ export function headline(key: PeriodKey, now: Date = new Date()): Headline {
     );
   }
 
-  const activeUnitDays = dataset()
-    .products.filter((p) => soldByProduct.has(p.id))
+  const activeUnitDays = store.products
+    .filter((p) => soldByProduct.has(p.id))
     .reduce((sum, p) => sum + p.totalUnits * days, 0);
 
-  const unitsOnHire = dataset()
-    .reservations.filter(
+  const unitsOnHire = store.reservations
+    .filter(
       (r) =>
         r.status === "out" &&
         new Date(r.startsAt).getTime() <= windowEnd &&
@@ -114,8 +118,13 @@ export interface ProductRow {
   utilisation: number;
 }
 
-export function topProducts(key: PeriodKey, limit = 8, now: Date = new Date()): ProductRow[] {
-  const orders = ordersInPeriod(key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
+export function topProducts(
+  store: Dataset,
+  key: PeriodKey,
+  limit = 8,
+  now: Date = new Date(),
+): ProductRow[] {
+  const orders = ordersInPeriod(store, key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
   const rows = new Map<string, ProductRow>();
   const days = periodDays(key);
 
@@ -143,7 +152,7 @@ export function topProducts(key: PeriodKey, limit = 8, now: Date = new Date()): 
       existing.unitsOut += line.quantity;
       existing.revenue = round2(existing.revenue + line.lineTotal);
       existing.utilisation = round2(
-        existing.utilisation + (line.quantity * spanDays) / (product.totalUnits * days) * 100,
+        existing.utilisation + ((line.quantity * spanDays) / (product.totalUnits * days)) * 100,
       );
 
       rows.set(line.productId, existing);
@@ -163,8 +172,13 @@ export interface CustomerRow {
   lateReturns: number;
 }
 
-export function topCustomers(key: PeriodKey, limit = 6, now: Date = new Date()): CustomerRow[] {
-  const orders = ordersInPeriod(key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
+export function topCustomers(
+  store: Dataset,
+  key: PeriodKey,
+  limit = 6,
+  now: Date = new Date(),
+): CustomerRow[] {
+  const orders = ordersInPeriod(store, key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
   const rows = new Map<string, CustomerRow>();
 
   for (const order of orders) {
@@ -197,8 +211,12 @@ export interface TrendPoint {
   orders: number;
 }
 
-/** Revenue bucketed by ISO week, oldest first. */
-export function revenueTrend(key: PeriodKey, now: Date = new Date()): TrendPoint[] {
+/** Revenue bucketed across the period, oldest first. */
+export function revenueTrend(
+  store: Dataset,
+  key: PeriodKey,
+  now: Date = new Date(),
+): TrendPoint[] {
   const days = periodDays(key);
   const buckets = Math.min(12, Math.max(4, Math.round(days / 14)));
   const bucketMs = (days * 86_400_000) / buckets;
@@ -212,7 +230,7 @@ export function revenueTrend(key: PeriodKey, now: Date = new Date()): TrendPoint
     orders: 0,
   }));
 
-  for (const order of dataset().orders) {
+  for (const order of store.orders) {
     if (!REVENUE_STATUSES.includes(order.status)) continue;
     const t = new Date(order.startsAt).getTime();
     if (t < start || t > now.getTime()) continue;
@@ -230,8 +248,12 @@ export interface CategoryRow {
   share: number;
 }
 
-export function categoryMix(key: PeriodKey, now: Date = new Date()): CategoryRow[] {
-  const orders = ordersInPeriod(key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
+export function categoryMix(
+  store: Dataset,
+  key: PeriodKey,
+  now: Date = new Date(),
+): CategoryRow[] {
+  const orders = ordersInPeriod(store, key, now).filter((o) => REVENUE_STATUSES.includes(o.status));
   const totals = new Map<string, number>();
 
   for (const order of orders) {
@@ -262,14 +284,13 @@ export interface LateRow {
   fee: number;
 }
 
-export function lateReturns(key: PeriodKey, now: Date = new Date()): LateRow[] {
+export function lateReturns(store: Dataset, key: PeriodKey, now: Date = new Date()): LateRow[] {
   const cutoff = now.getTime() - periodDays(key) * 86_400_000;
-  const { deliveries, orders } = dataset();
 
-  return deliveries
+  return store.deliveries
     .filter((d) => d.kind === "return" && new Date(d.scheduledAt).getTime() >= cutoff)
     .map((d): LateRow | null => {
-      const order = orders.find((o) => o.id === d.orderId);
+      const order = store.orders.find((o) => o.id === d.orderId);
       if (!order) return null;
       const end = new Date(d.completedAt ?? now.toISOString()).getTime();
       const due = new Date(d.scheduledAt).getTime();
@@ -290,15 +311,15 @@ export function lateReturns(key: PeriodKey, now: Date = new Date()): LateRow[] {
 }
 
 /** Everything the report page and the CSV/XLSX/PDF exports read from. */
-export function reportBundle(key: PeriodKey, now: Date = new Date()) {
+export function reportBundle(store: Dataset, key: PeriodKey, now: Date = new Date()) {
   return {
     period: PERIODS.find((p) => p.key === key)!,
-    headline: headline(key, now),
-    products: topProducts(key, 10, now),
-    customers: topCustomers(key, 8, now),
-    trend: revenueTrend(key, now),
-    categories: categoryMix(key, now),
-    late: lateReturns(key, now),
+    headline: headline(store, key, now),
+    products: topProducts(store, key, 10, now),
+    customers: topCustomers(store, key, 8, now),
+    trend: revenueTrend(store, key, now),
+    categories: categoryMix(store, key, now),
+    late: lateReturns(store, key, now),
   };
 }
 

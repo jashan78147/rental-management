@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = createOrder(parsed.data);
+  const result = await createOrder(parsed.data);
 
   if (!result.ok) {
     return NextResponse.json(

@@ -1,7 +1,7 @@
-import { allProducts, categoryById, dataset, pricelists, profileById, settings } from "@/lib/data/store";
+import { allProducts, categoryById, pricelists, profileById, settings } from "@/lib/data/store";
 import { availableUnits, nextFreeWindow } from "./availability";
 import { durationHours, priceLine, round2, selectPricelist } from "./pricing";
-import type { CartItem, CustomerSegment, PriceChunk } from "./types";
+import type { CartItem, CustomerSegment, PriceChunk, Reservation } from "./types";
 
 export interface QuoteLine {
   productId: string;
@@ -44,10 +44,11 @@ export function buildQuote(args: {
   items: CartItem[];
   startsAt: string;
   endsAt: string;
+  reservations: Reservation[];
   customerId?: string;
   ignoreOrderId?: string;
 }): Quote {
-  const { items, startsAt, endsAt, customerId, ignoreOrderId } = args;
+  const { items, startsAt, endsAt, reservations, customerId, ignoreOrderId } = args;
 
   const profile = customerId ? profileById(customerId) : undefined;
   const segment: CustomerSegment = profile?.segment ?? "retail";
@@ -55,7 +56,6 @@ export function buildQuote(args: {
     selectPricelist(pricelists, segment, new Date(startsAt)) ?? pricelists[0];
 
   const hours = durationHours(startsAt, endsAt);
-  const { reservations } = dataset();
 
   const lines: QuoteLine[] = items
     .map((item): QuoteLine | null => {

@@ -1,8 +1,9 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { allProducts, categoryById, dataset, productById } from "@/lib/data/store";
+import { allProducts, categoryById, productById } from "@/lib/data/store";
+import type { Dataset } from "@/lib/data/store";
 import { availableUnits } from "@/lib/domain/availability";
-import type { Product } from "@/lib/domain/types";
+import type { Product, RentalOrder, Reservation } from "@/lib/domain/types";
 import { AI_MODEL, aiClient, aiConfigured, describeAiError } from "./client";
 
 export interface Suggestion {
@@ -37,10 +38,10 @@ const SuggestionSchema = z.object({
  * How often two products have appeared on the same order.
  * Doubles as the no-key fallback and as a signal handed to the model.
  */
-export function coRentalAffinity(): Map<string, Map<string, number>> {
+export function coRentalAffinity(orders: RentalOrder[]): Map<string, Map<string, number>> {
   const affinity = new Map<string, Map<string, number>>();
 
-  for (const order of dataset().orders) {
+  for (const order of orders) {
     const ids = [...new Set(order.lines.map((l) => l.productId))];
     for (const a of ids) {
       for (const b of ids) {
@@ -55,14 +56,20 @@ export function coRentalAffinity(): Map<string, Map<string, number>> {
   return affinity;
 }
 
-function availabilityFor(product: Product, startsAt: string, endsAt: string): number {
-  return availableUnits(product, dataset().reservations, startsAt, endsAt);
+function availabilityFor(
+  product: Product,
+  reservations: Reservation[],
+  startsAt: string,
+  endsAt: string,
+): number {
+  return availableUnits(product, reservations, startsAt, endsAt);
 }
 
 function toSuggestion(
   product: Product,
   reason: string,
   confidence: Suggestion["confidence"],
+  reservations: Reservation[],
   startsAt: string,
   endsAt: string,
 ): Suggestion {
@@ -72,13 +79,14 @@ function toSuggestion(
     slug: product.slug,
     imageUrl: product.imageUrl,
     reason,
-    available: availabilityFor(product, startsAt, endsAt),
+    available: availabilityFor(product, reservations, startsAt, endsAt),
     confidence,
   };
 }
 
 /** Deterministic recommender: co-rental history first, shared tags second. */
 export function affinityRecommend(
+  store: Dataset,
   cartProductIds: string[],
   startsAt: string,
   endsAt: string,
@@ -86,7 +94,7 @@ export function affinityRecommend(
 ): Suggestion[] {
   if (cartProductIds.length === 0) return [];
 
-  const affinity = coRentalAffinity();
+  const affinity = coRentalAffinity(store.orders);
   const inCart = new Set(cartProductIds);
   const scores = new Map<string, number>();
 
@@ -107,7 +115,7 @@ export function affinityRecommend(
   return [...scores.entries()]
     .map(([id, score]) => ({ product: productById(id), score }))
     .filter((row): row is { product: Product; score: number } => Boolean(row.product))
-    .filter((row) => availabilityFor(row.product, startsAt, endsAt) > 0)
+    .filter((row) => availabilityFor(row.product, store.reservations, startsAt, endsAt) > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((row) => {
@@ -119,16 +127,17 @@ export function affinityRecommend(
         row.product,
         reason,
         row.score >= 6 ? "high" : row.score >= 3 ? "medium" : "low",
+        store.reservations,
         startsAt,
         endsAt,
       );
     });
 }
 
-function catalogContext(startsAt: string, endsAt: string): string {
+function catalogContext(store: Dataset, startsAt: string, endsAt: string): string {
   return allProducts
     .map((p) => {
-      const free = availabilityFor(p, startsAt, endsAt);
+      const free = availabilityFor(p, store.reservations, startsAt, endsAt);
       return [
         p.id,
         p.name,
@@ -154,11 +163,12 @@ Rules:
 - If nothing genuinely adds value, return fewer suggestions or an empty list.`;
 
 export async function recommendKit(args: {
+  store: Dataset;
   cartProductIds: string[];
   startsAt: string;
   endsAt: string;
 }): Promise<RecommendationResult> {
-  const { cartProductIds, startsAt, endsAt } = args;
+  const { store, cartProductIds, startsAt, endsAt } = args;
 
   if (cartProductIds.length === 0) {
     return { suggestions: [], source: "affinity" };
@@ -166,13 +176,13 @@ export async function recommendKit(args: {
 
   if (!aiConfigured()) {
     return {
-      suggestions: affinityRecommend(cartProductIds, startsAt, endsAt),
+      suggestions: affinityRecommend(store, cartProductIds, startsAt, endsAt),
       source: "affinity",
       note: "Set ANTHROPIC_API_KEY to switch this panel to Claude.",
     };
   }
 
-  const affinity = coRentalAffinity();
+  const affinity = coRentalAffinity(store.orders);
   const historySignal = cartProductIds
     .flatMap((id) =>
       [...(affinity.get(id) ?? [])]
@@ -198,7 +208,7 @@ export async function recommendKit(args: {
       system: [
         {
           type: "text",
-          text: `${SYSTEM}\n\nCATALOG\n${catalogContext(startsAt, endsAt)}`,
+          text: `${SYSTEM}\n\nCATALOG\n${catalogContext(store, startsAt, endsAt)}`,
           cache_control: { type: "ephemeral" },
         },
       ],
@@ -219,14 +229,14 @@ export async function recommendKit(args: {
       .map((s) => ({ product: productById(s.product_id), s }))
       .filter((row) => row.product && !inCart.has(row.product.id))
       .map((row) =>
-        toSuggestion(row.product!, row.s.reason, row.s.confidence, startsAt, endsAt),
+        toSuggestion(row.product!, row.s.reason, row.s.confidence, store.reservations, startsAt, endsAt),
       )
       .filter((s) => s.available > 0)
       .slice(0, 4);
 
     if (suggestions.length === 0) {
       return {
-        suggestions: affinityRecommend(cartProductIds, startsAt, endsAt),
+        suggestions: affinityRecommend(store, cartProductIds, startsAt, endsAt),
         source: "affinity",
         note: "Claude had nothing to add, so this falls back to booking history.",
       };
@@ -235,7 +245,7 @@ export async function recommendKit(args: {
     return { suggestions, source: "claude" };
   } catch (error) {
     return {
-      suggestions: affinityRecommend(cartProductIds, startsAt, endsAt),
+      suggestions: affinityRecommend(store, cartProductIds, startsAt, endsAt),
       source: "affinity",
       note: describeAiError(error),
     };

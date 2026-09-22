@@ -3,7 +3,8 @@ import Link from "next/link";
 import { ActionForm } from "@/components/console/action-form";
 import { Badge, Card, EmptyState, Stat, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { payInvoiceAction } from "@/lib/actions";
-import { dataset, profileById, settings } from "@/lib/data/store";
+import { profileById, settings } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { fmtDateFull, money, moneyCompact } from "@/lib/format";
 import { firstParam } from "@/lib/window";
 
@@ -22,7 +23,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
   const params = await searchParams;
   const filter = firstParam(params.filter) ?? "all";
 
-  const store = dataset();
+  const store = await loadDataset();
 
   const invoices = store.invoices
     .filter((invoice) => {

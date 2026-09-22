@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { BRAND } from "@/lib/data/seed";
 import { PERIODS, reportBundle, type PeriodKey } from "@/lib/domain/reports";
+import { loadDataset } from "@/lib/data/persist";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,8 @@ interface Sheet {
   rows: Row[];
 }
 
-function sheets(period: PeriodKey): Sheet[] {
-  const bundle = reportBundle(period);
+async function sheets(period: PeriodKey): Promise<Sheet[]> {
+  const bundle = reportBundle(await loadDataset(), period);
   const h = bundle.headline;
 
   return [
@@ -166,7 +167,7 @@ export async function GET(request: Request) {
   const period = (PERIODS.find((p) => p.key === requested)?.key ?? "90d") as PeriodKey;
   const periodLabel = PERIODS.find((p) => p.key === period)!.label;
 
-  const data = sheets(period);
+  const data = await sheets(period);
   const stamp = new Date().toISOString().slice(0, 10);
   const base = `bandobast-report-${period}-${stamp}`;
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { recommendKit } from "@/lib/ai/recommend";
+import { loadDataset } from "@/lib/data/persist";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
   }
 
   const result = await recommendKit({
+    store: await loadDataset(),
     cartProductIds: parsed.data.productIds,
     startsAt: parsed.data.startsAt,
     endsAt: parsed.data.endsAt,

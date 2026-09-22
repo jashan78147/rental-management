@@ -1,6 +1,6 @@
-import { dataset, productById } from "@/lib/data/store";
+import { productById } from "@/lib/data/store";
 import { availableUnits } from "@/lib/domain/availability";
-import type { Product } from "@/lib/domain/types";
+import type { Product, Reservation } from "@/lib/domain/types";
 
 /**
  * Rule-based kit builder.
@@ -305,10 +305,14 @@ const ESSENTIAL = new Set(["p-genset", "p-distro", "p-vmount"]);
 
 const MAX_PICKS = 9;
 
-export function ruleBasedKit(query: string, startsAt: string, endsAt: string): RuleKitResult {
+export function ruleBasedKit(
+  query: string,
+  startsAt: string,
+  endsAt: string,
+  reservations: Reservation[],
+): RuleKitResult {
   const brief = parseBrief(query);
   const composed = composeKit(brief);
-  const { reservations } = dataset();
 
   const resolved = composed
     .map((pick) => {

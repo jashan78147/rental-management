@@ -3,7 +3,8 @@ import Link from "next/link";
 import { CustomerSwitch } from "@/components/portal/customer-switch";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { profiles } from "@/lib/data/seed";
-import { dataset, notificationRules, profileById } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { fmtDateTime, relativeTime } from "@/lib/format";
 import { firstParam } from "@/lib/window";
 
@@ -22,7 +23,8 @@ export default async function PortalNotificationsPage({
   const customerId = firstParam(params.as) ?? CUSTOMERS[0].id;
   const customer = profileById(customerId) ?? CUSTOMERS[0];
 
-  const store = dataset();
+  const store = await loadDataset();
+  const notificationRules = store.notificationRules;
   const orderIds = new Set(
     store.orders.filter((o) => o.customerId === customer.id).map((o) => o.id),
   );

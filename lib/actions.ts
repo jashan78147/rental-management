@@ -1,8 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { advanceOrder, confirmOrder, payInvoice } from "@/lib/data/mutations";
-import { dataset, notificationRules, settings } from "@/lib/data/store";
+import {
+  advanceOrder,
+  confirmOrder,
+  payInvoice,
+  sendNotification,
+  updateReminderRule,
+} from "@/lib/data/mutations";
+import { resetToSeed } from "@/lib/db/repo";
+import { dbConfigured } from "@/lib/db/client";
 import type { OrderStatus } from "@/lib/domain/types";
 
 export interface ActionState {
@@ -16,7 +23,11 @@ function refresh(orderId?: string) {
   revalidatePath("/console/schedule");
   revalidatePath("/console/invoices");
   revalidatePath("/console/reports");
+  revalidatePath("/console/notifications");
+  revalidatePath("/console/products");
   revalidatePath("/portal");
+  revalidatePath("/portal/invoices");
+  revalidatePath("/portal/notifications");
   revalidatePath("/catalog");
   if (orderId) {
     revalidatePath(`/console/orders/${orderId}`);
@@ -34,7 +45,7 @@ export async function confirmOrderAction(
       ? "full_upfront"
       : "deposit_then_balance";
 
-  const result = confirmOrder(orderId, mode);
+  const result = await confirmOrder(orderId, mode);
   refresh(orderId);
 
   return result.ok
@@ -52,7 +63,7 @@ export async function advanceOrderAction(
   const orderId = String(formData.get("orderId") ?? "");
   const to = String(formData.get("to") ?? "") as OrderStatus;
 
-  const result = advanceOrder(orderId, to);
+  const result = await advanceOrder(orderId, to);
   refresh(orderId);
 
   if (!result.ok) return { ok: false, message: result.error ?? "Could not update this order." };
@@ -74,7 +85,7 @@ export async function payInvoiceAction(
   const invoiceId = String(formData.get("invoiceId") ?? "");
   const reference = `pi_test_${Date.now().toString(36)}`;
 
-  const result = payInvoice(invoiceId, reference);
+  const result = await payInvoice(invoiceId, reference);
   refresh(result.order?.id);
 
   return result.ok
@@ -82,49 +93,27 @@ export async function payInvoiceAction(
     : { ok: false, message: result.error ?? "Could not record that payment." };
 }
 
-/**
- * Change how many days before a return a reminder fires. Queued reminders that
- * have not gone out yet are rescheduled so the new lead time takes effect now
- * rather than only on the next booking.
- */
 export async function updateReminderLeadAction(
   _prev: ActionState | null,
   formData: FormData,
 ): Promise<ActionState> {
   const ruleId = String(formData.get("ruleId") ?? "");
   const leadDays = Number(formData.get("leadDays"));
-  const active = formData.get("isActive") !== null;
+  const isActive = formData.get("isActive") !== null;
 
   if (!Number.isInteger(leadDays) || leadDays < 0 || leadDays > 30) {
     return { ok: false, message: "Lead time has to be a whole number of days between 0 and 30." };
   }
 
-  const rule = notificationRules.find((r) => r.id === ruleId);
-  if (!rule) return { ok: false, message: "Reminder rule not found." };
+  const result = await updateReminderRule(ruleId, leadDays, isActive);
+  refresh();
 
-  rule.leadDays = leadDays;
-  rule.isActive = active;
+  if (!result.ok) return { ok: false, message: result.error ?? "Could not update that rule." };
 
-  const store = dataset();
-  let rescheduled = 0;
-
-  for (const notification of store.notifications) {
-    if (notification.ruleId !== ruleId || notification.sentAt) continue;
-    const order = store.orders.find((o) => o.id === notification.orderId);
-    if (!order) continue;
-    notification.scheduledFor = new Date(
-      new Date(order.endsAt).getTime() - leadDays * 86_400_000,
-    ).toISOString();
-    rescheduled += 1;
-  }
-
-  settings.notificationLeadDays = leadDays;
-  revalidatePath("/console/notifications");
-  revalidatePath("/portal/notifications");
-
+  const count = result.rescheduled ?? 0;
   return {
     ok: true,
-    message: `Lead time set to ${leadDays} day${leadDays === 1 ? "" : "s"}. ${rescheduled} queued reminder${rescheduled === 1 ? "" : "s"} rescheduled.`,
+    message: `Lead time set to ${leadDays} day${leadDays === 1 ? "" : "s"}. ${count} queued reminder${count === 1 ? "" : "s"} rescheduled.`,
   };
 }
 
@@ -133,14 +122,37 @@ export async function sendNotificationAction(
   formData: FormData,
 ): Promise<ActionState> {
   const id = String(formData.get("notificationId") ?? "");
-  const notification = dataset().notifications.find((n) => n.id === id);
+  const result = await sendNotification(id);
+  refresh();
 
-  if (!notification) return { ok: false, message: "Reminder not found." };
-  if (notification.sentAt) return { ok: false, message: "That reminder has already gone out." };
+  return result.ok
+    ? { ok: true, message: `Reminder sent to the ${result.audience?.replace("_", " ")}.` }
+    : { ok: false, message: result.error ?? "Could not send that reminder." };
+}
 
-  notification.sentAt = new Date().toISOString();
-  notification.status = "sent";
-  refresh(notification.orderId);
+/**
+ * Wipe the transactional tables and re-seed. Demo data only, and the whole
+ * point is to be able to run the same walkthrough twice.
+ */
+export async function resetDemoAction(
+  _prev: ActionState | null,
+  _formData: FormData,
+): Promise<ActionState> {
+  if (!dbConfigured()) {
+    return {
+      ok: false,
+      message: "No database attached, so there is nothing to reset. Restart the dev server instead.",
+    };
+  }
 
-  return { ok: true, message: `Reminder sent to the ${notification.audience.replace("_", " ")}.` };
+  try {
+    await resetToSeed();
+    refresh();
+    return { ok: true, message: "Demo data restored. Every order, invoice and reminder is back to its seeded state." };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : "Could not reset the demo data.",
+    };
+  }
 }

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { allProducts, categoryById, dataset, productById } from "@/lib/data/store";
+import { allProducts, categoryById, productById } from "@/lib/data/store";
+import type { Dataset } from "@/lib/data/store";
 import { availableUnits } from "@/lib/domain/availability";
 import { AI_MODEL, aiClient, aiConfigured, describeAiError } from "./client";
 import { ruleBasedKit } from "./rules";
@@ -29,14 +30,19 @@ export interface SearchResult {
  * applies the desk's dependency rules; keyword overlap is only a last resort
  * for a brief too vague to infer anything from.
  */
-function rulesResult(query: string, startsAt: string, endsAt: string): SearchResult {
-  const kit = ruleBasedKit(query, startsAt, endsAt);
+function rulesResult(
+  store: Dataset,
+  query: string,
+  startsAt: string,
+  endsAt: string,
+): SearchResult {
+  const kit = ruleBasedKit(query, startsAt, endsAt, store.reservations);
 
   if (kit.picks.length === 0) {
     return {
       understood: `Nothing specific to infer from that, so this is a plain keyword match.`,
       suggestedDurationHours: null,
-      picks: keywordSearch(query, startsAt, endsAt),
+      picks: keywordSearch(store, query, startsAt, endsAt),
       missing: ["Name the kind of job, the rough size, and whether there is power on site."],
       source: "keyword",
     };
@@ -86,17 +92,22 @@ Rules:
 - "missing" lists at most three things the customer still needs to tell you before this quote is firm. Leave it empty if the brief is clear.
 - Prefer four to seven picks. A kit that is all cameras and no support is a bad kit.`;
 
-function catalogContext(startsAt: string, endsAt: string): string {
+function catalogContext(store: Dataset, startsAt: string, endsAt: string): string {
   return allProducts
     .map((p) => {
-      const free = availableUnits(p, dataset().reservations, startsAt, endsAt);
+      const free = availableUnits(p, store.reservations, startsAt, endsAt);
       return `${p.id} | ${p.name} | ${categoryById(p.categoryId)?.name} | tags: ${p.tags.join(", ")} | ${p.description.slice(0, 90)} | free units: ${free}`;
     })
     .join("\n");
 }
 
 /** Token overlap against name, tags and description. Used when no key is set. */
-export function keywordSearch(query: string, startsAt: string, endsAt: string): SearchPick[] {
+export function keywordSearch(
+  store: Dataset,
+  query: string,
+  startsAt: string,
+  endsAt: string,
+): SearchPick[] {
   const terms = query
     .toLowerCase()
     .split(/[^a-z0-9]+/)
@@ -108,7 +119,7 @@ export function keywordSearch(query: string, startsAt: string, endsAt: string): 
     .map((product) => {
       const haystack = `${product.name} ${product.tags.join(" ")} ${product.description}`.toLowerCase();
       const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
-      const available = availableUnits(product, dataset().reservations, startsAt, endsAt);
+      const available = availableUnits(product, store.reservations, startsAt, endsAt);
       return { product, score, available };
     })
     .filter((row) => row.score > 0 && row.available > 0)
@@ -126,13 +137,14 @@ export function keywordSearch(query: string, startsAt: string, endsAt: string): 
 }
 
 export async function searchKit(args: {
+  store: Dataset;
   query: string;
   startsAt: string;
   endsAt: string;
 }): Promise<SearchResult> {
-  const { query, startsAt, endsAt } = args;
+  const { store, query, startsAt, endsAt } = args;
 
-  if (!aiConfigured()) return rulesResult(query, startsAt, endsAt);
+  if (!aiConfigured()) return rulesResult(store, query, startsAt, endsAt);
 
   try {
     const response = await aiClient().messages.parse({
@@ -142,7 +154,7 @@ export async function searchKit(args: {
       system: [
         {
           type: "text",
-          text: `${SYSTEM}\n\nCATALOG\n${catalogContext(startsAt, endsAt)}`,
+          text: `${SYSTEM}\n\nCATALOG\n${catalogContext(store, startsAt, endsAt)}`,
           cache_control: { type: "ephemeral" },
         },
       ],
@@ -162,7 +174,7 @@ export async function searchKit(args: {
       .map((pick) => {
         const product = productById(pick.product_id);
         if (!product) return null;
-        const available = availableUnits(product, dataset().reservations, startsAt, endsAt);
+        const available = availableUnits(product, store.reservations, startsAt, endsAt);
         if (available <= 0) return null;
         return {
           productId: product.id,
@@ -184,6 +196,6 @@ export async function searchKit(args: {
       source: "claude",
     };
   } catch (error) {
-    return { ...rulesResult(query, startsAt, endsAt), note: describeAiError(error) };
+    return { ...rulesResult(store, query, startsAt, endsAt), note: describeAiError(error) };
   }
 }

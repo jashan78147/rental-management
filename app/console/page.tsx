@@ -2,8 +2,12 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { OperatorBrief, OperatorBriefSkeleton } from "@/components/console/operator-brief";
+import { ActionForm } from "@/components/console/action-form";
 import { Badge, Card, EmptyState, Stat, StatusBadge } from "@/components/ui";
-import { dataset, lateFeeRules, profileById } from "@/lib/data/store";
+import { resetDemoAction } from "@/lib/actions";
+import { dbConfigured } from "@/lib/db/client";
+import { lateFeeRules, profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { returnRisk } from "@/lib/domain/fees";
 import { headline, PERIODS, type PeriodKey } from "@/lib/domain/reports";
 import { fmtDateTime, money, moneyCompact, relativeTime } from "@/lib/format";
@@ -16,8 +20,8 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
   const period = (PERIODS.find((p) => p.key === firstParam(params.period))?.key ??
     "90d") as PeriodKey;
 
-  const stats = headline(period);
-  const store = dataset();
+  const store = await loadDataset();
+  const stats = headline(store, period);
   const risks = returnRisk(store.orders, lateFeeRules, store.products);
 
   const now = Date.now();
@@ -85,7 +89,7 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_1fr] xl:items-start">
         <Suspense fallback={<OperatorBriefSkeleton />}>
-          <OperatorBrief period={period} />
+          <OperatorBrief store={store} period={period} />
         </Suspense>
 
         <Card className="overflow-hidden">
@@ -219,6 +223,27 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
           )}
         </Card>
       </div>
+
+      <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-5">
+        <div>
+          <h2 className="font-display font-semibold">Demo data</h2>
+          <p className="mt-1 max-w-2xl text-sm text-ink-soft">
+            {dbConfigured()
+              ? "Restore every order, reservation, invoice and reminder to its seeded state, so the same walkthrough can be run twice. Nothing here is real customer data."
+              : "No database is attached, so this instance is running on an in-process copy of the seed. Restart the dev server to reset it."}
+          </p>
+        </div>
+        {dbConfigured() ? (
+          <ActionForm
+            action={resetDemoAction}
+            label="Reset demo data"
+            pendingLabel="Restoring…"
+            variant="secondary"
+            confirm="Restore all demo data to its seeded state? Any orders you created will be removed."
+            fields={{}}
+          />
+        ) : null}
+      </Card>
     </div>
   );
 }

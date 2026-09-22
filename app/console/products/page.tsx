@@ -3,7 +3,8 @@ import Link from "next/link";
 import { AvailabilityStrip } from "@/components/shop/availability-strip";
 import { Badge, Card } from "@/components/ui";
 import { categories, products as productSeeds } from "@/lib/data/seed";
-import { allProducts, categoryById, dataset } from "@/lib/data/store";
+import { allProducts, categoryById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { availableUnits, dailyLoad } from "@/lib/domain/availability";
 import { topProducts } from "@/lib/domain/reports";
 import { money } from "@/lib/format";
@@ -17,11 +18,11 @@ export default async function FleetPage({ searchParams }: { searchParams: Search
   const params = await searchParams;
   const focus = firstParam(params.product);
 
-  const store = dataset();
+  const store = await loadDataset();
   const now = new Date();
   const weekOut = new Date(now.getTime() + 7 * 86_400_000);
 
-  const performance = new Map(topProducts("90d", 100).map((row) => [row.productId, row]));
+  const performance = new Map(topProducts(store, "90d", 100).map((row) => [row.productId, row]));
 
   const rows = allProducts.map((product) => ({
     product,

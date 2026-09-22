@@ -4,6 +4,7 @@ import type {
   AppNotification,
   Delivery,
   Invoice,
+  NotificationRule,
   OrderLine,
   Payment,
   Product,
@@ -13,7 +14,7 @@ import type {
 import {
   categories,
   lateFeeRules,
-  notificationRules,
+  notificationRules as notificationRuleSeeds,
   orderSeeds,
   pricelists,
   products as productSeeds,
@@ -29,6 +30,7 @@ export interface Dataset {
   invoices: Invoice[];
   payments: Payment[];
   notifications: AppNotification[];
+  notificationRules: NotificationRule[];
 }
 
 const products: Product[] = productSeeds.map(({ rates: _rates, ...product }) => product);
@@ -40,13 +42,19 @@ function isoAt(offsetDays: number, hour: number): string {
   return date.toISOString();
 }
 
-function build(): Dataset {
+/**
+ * Generate the demo dataset, anchored to today so there is always something
+ * overdue, something out with a customer and something upcoming. Used to seed
+ * an empty database, and as the whole dataset when no database is attached.
+ */
+export function buildSeedDataset(): Dataset {
   const orders: RentalOrder[] = [];
   const reservations: Reservation[] = [];
   const deliveries: Delivery[] = [];
   const invoices: Invoice[] = [];
   const payments: Payment[] = [];
   const notifications: AppNotification[] = [];
+  const rules = notificationRuleSeeds.map((rule) => ({ ...rule }));
 
   orderSeeds.forEach((seed, index) => {
     const customer = profiles.find((p) => p.id === seed.customerId)!;
@@ -153,7 +161,6 @@ function build(): Dataset {
       });
     });
 
-    // Pickup document.
     const pickedUp = seed.status === "picked_up" || seed.status === "returned";
     deliveries.push({
       id: `d-${orderId}-out`,
@@ -161,13 +168,14 @@ function build(): Dataset {
       kind: "pickup",
       documentNo: `PU-${seed.reference.slice(3)}`,
       scheduledAt: new Date(new Date(startsAt).getTime() - 2 * 3_600_000).toISOString(),
-      completedAt: pickedUp ? new Date(new Date(startsAt).getTime() - 3_600_000).toISOString() : undefined,
+      completedAt: pickedUp
+        ? new Date(new Date(startsAt).getTime() - 3_600_000).toISOString()
+        : undefined,
       status: pickedUp ? "done" : "scheduled",
       address: `${customer.city} site address on file`,
       handler: index % 2 === 0 ? "Ravindra Salunkhe" : "Meher Jamshedji",
     });
 
-    // Return document.
     const returned = seed.status === "returned";
     const overdue = !returned && new Date(endsAt).getTime() < Date.now();
     deliveries.push({
@@ -252,8 +260,7 @@ function build(): Dataset {
       });
     }
 
-    // Return reminders, scheduled from the configurable lead time.
-    notificationRules
+    rules
       .filter((rule) => rule.isActive && rule.event === "before_return")
       .forEach((rule) => {
         const scheduledFor = new Date(
@@ -276,13 +283,22 @@ function build(): Dataset {
               ? `Your rental ${seed.reference} is scheduled to return on ${new Date(endsAt).toLocaleString("en-IN")}. Reply to this mail or use the portal if you need to extend.`
               : `Collection run for ${seed.reference} (${customer.fullName}, ${customer.city}). ${order.lines.length} line items to check in.`,
           scheduledFor,
-          sentAt: due && !returned ? scheduledFor : due ? scheduledFor : undefined,
+          sentAt: due ? scheduledFor : undefined,
           status: due ? "sent" : "scheduled",
         });
       });
   });
 
-  return { products, orders, reservations, deliveries, invoices, payments, notifications };
+  return {
+    products,
+    orders,
+    reservations,
+    deliveries,
+    invoices,
+    payments,
+    notifications,
+    notificationRules: rules,
+  };
 }
 
 declare global {
@@ -290,17 +306,25 @@ declare global {
 }
 
 /**
- * Single in-process dataset. It survives across requests in one server instance,
- * which is what the demo needs; Supabase takes over when its env vars are set.
+ * Fallback store for when no database is attached: one dataset per server
+ * process. Fine locally, where there is exactly one process; on serverless each
+ * function gets its own copy, which is why the database exists.
  */
-export function dataset(): Dataset {
+export function memoryDataset(): Dataset {
   if (!globalThis.__bandobastDataset) {
-    globalThis.__bandobastDataset = build();
+    globalThis.__bandobastDataset = buildSeedDataset();
   }
   return globalThis.__bandobastDataset;
 }
 
-export { categories, lateFeeRules, notificationRules, pricelists, profiles, settings };
+export {
+  categories,
+  lateFeeRules,
+  notificationRuleSeeds as notificationRules,
+  pricelists,
+  profiles,
+  settings,
+};
 export const allProducts = products;
 
 export function productById(id: string): Product | undefined {
@@ -317,12 +341,4 @@ export function categoryById(id: string) {
 
 export function profileById(id: string) {
   return profiles.find((p) => p.id === id);
-}
-
-export function orderById(id: string): RentalOrder | undefined {
-  return dataset().orders.find((o) => o.id === id);
-}
-
-export function orderByReference(reference: string): RentalOrder | undefined {
-  return dataset().orders.find((o) => o.reference === reference);
 }

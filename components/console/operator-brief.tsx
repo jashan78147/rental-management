@@ -1,6 +1,7 @@
 import { Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { operatorBrief } from "@/lib/ai/brief";
 import type { PeriodKey } from "@/lib/domain/reports";
+import type { Dataset } from "@/lib/data/store";
 import { Badge, Card } from "@/components/ui";
 import { cn } from "@/lib/format";
 
@@ -10,8 +11,8 @@ const SEVERITY = {
   opportunity: { tone: "pine" as const, label: "Chase" },
 };
 
-export async function OperatorBrief({ period }: { period: PeriodKey }) {
-  const brief = await operatorBrief(period);
+export async function OperatorBrief({ store, period }: { store: Dataset; period: PeriodKey }) {
+  const brief = await operatorBrief(store, period);
 
   return (
     <Card className="overflow-hidden">

@@ -5,7 +5,8 @@ import { ArrowLeft, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
 import { ActionForm } from "@/components/console/action-form";
 import { Badge, Card, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { confirmOrderAction, payInvoiceAction } from "@/lib/actions";
-import { dataset, pricelists, productById, profileById, settings } from "@/lib/data/store";
+import { pricelists, productById, profileById, settings } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { UNIT_LABEL } from "@/lib/domain/pricing";
 import { durationLabel, fmtDateFull, fmtDateTime, money, relativeTime } from "@/lib/format";
 import { firstParam } from "@/lib/window";
@@ -15,7 +16,8 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
   const { id } = await params;
-  const order = dataset().orders.find((o) => o.id === id);
+  const store = await loadDataset();
+  const order = store.orders.find((o) => o.id === id);
   return { title: order ? order.reference : "Rental" };
 }
 
@@ -29,7 +31,7 @@ export default async function PortalOrderPage({
   const { id } = await params;
   const search = await searchParams;
 
-  const store = dataset();
+  const store = await loadDataset();
   const order = store.orders.find((o) => o.id === id);
   if (!order) notFound();
 

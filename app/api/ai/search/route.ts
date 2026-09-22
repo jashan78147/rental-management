@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { searchKit } from "@/lib/ai/search";
+import { loadDataset } from "@/lib/data/persist";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -37,6 +38,7 @@ export async function POST(request: Request) {
 
   const fallback = defaultWindow();
   const result = await searchKit({
+    store: await loadDataset(),
     query: parsed.data.query,
     startsAt: parsed.data.startsAt ?? fallback.startsAt,
     endsAt: parsed.data.endsAt ?? fallback.endsAt,

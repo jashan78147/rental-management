@@ -8,6 +8,7 @@ import {
 } from "@/components/console/report-charts";
 import { Badge, Card, EmptyState, Stat } from "@/components/ui";
 import { PERIODS, reportBundle, type PeriodKey } from "@/lib/domain/reports";
+import { loadDataset } from "@/lib/data/persist";
 import { SEGMENT_LABEL } from "@/lib/data/seed";
 import type { CustomerSegment } from "@/lib/domain/types";
 import { fmtDateTime, money, moneyCompact } from "@/lib/format";
@@ -28,7 +29,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   const period = (PERIODS.find((p) => p.key === firstParam(params.period))?.key ??
     "90d") as PeriodKey;
 
-  const bundle = reportBundle(period);
+  const bundle = reportBundle(await loadDataset(), period);
   const h = bundle.headline;
 
   return (

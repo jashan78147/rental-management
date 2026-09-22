@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { buildQuote } from "@/lib/domain/quote";
+import { loadDataset } from "@/lib/data/persist";
 
 export const runtime = "nodejs";
 
@@ -32,5 +33,6 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json(buildQuote(parsed.data));
+  const store = await loadDataset();
+  return NextResponse.json(buildQuote({ ...parsed.data, reservations: store.reservations }));
 }

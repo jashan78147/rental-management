@@ -6,7 +6,8 @@ import { AvailabilityStrip } from "@/components/shop/availability-strip";
 import { WindowPicker } from "@/components/shop/window-picker";
 import { Badge, Card, EmptyState, inputClass } from "@/components/ui";
 import { categories, products } from "@/lib/data/seed";
-import { allProducts, dataset } from "@/lib/data/store";
+import { allProducts } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { availableUnits, dailyLoad } from "@/lib/domain/availability";
 import { cn, durationLabel, money } from "@/lib/format";
 import { firstParam, resolveWindow } from "@/lib/window";
@@ -25,7 +26,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
   const query = firstParam(params.q)?.trim().toLowerCase() ?? "";
   const view = firstParam(params.view) === "calendar" ? "calendar" : "list";
 
-  const { reservations } = dataset();
+  const { reservations } = await loadDataset();
 
   const visible = allProducts
     .filter((p) => p.isRentable)

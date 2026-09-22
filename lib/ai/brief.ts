@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { dataset, lateFeeRules, profileById } from "@/lib/data/store";
+import { lateFeeRules, profileById } from "@/lib/data/store";
+import type { Dataset } from "@/lib/data/store";
 import { returnRisk } from "@/lib/domain/fees";
 import { categoryMix, headline, topCustomers, topProducts, type PeriodKey } from "@/lib/domain/reports";
 import { money } from "@/lib/format";
@@ -43,13 +44,13 @@ Rules:
 - Numbers you quote must come from the data given. Do not estimate or round in a way that changes them.
 - Plain working English. No filler verbs, no marketing language, no exclamation marks.`;
 
-function rulesBrief(period: PeriodKey): BriefResult {
-  const stats = headline(period);
-  const risks = returnRisk(dataset().orders, lateFeeRules, dataset().products);
+function rulesBrief(store: Dataset, period: PeriodKey): BriefResult {
+  const stats = headline(store, period);
+  const risks = returnRisk(store.orders, lateFeeRules, store.products);
   const overdue = risks.filter((r) => r.risk === "overdue");
   const dueSoon = risks.filter((r) => r.risk === "due_soon");
-  const products = topProducts(period, 3);
-  const quotes = dataset().orders.filter((o) => o.status === "quotation_sent");
+  const products = topProducts(store, period, 3);
+  const quotes = store.orders.filter((o) => o.status === "quotation_sent");
 
   const items: BriefItem[] = [];
 
@@ -94,18 +95,18 @@ function rulesBrief(period: PeriodKey): BriefResult {
   };
 }
 
-export async function operatorBrief(period: PeriodKey): Promise<BriefResult> {
+export async function operatorBrief(store: Dataset, period: PeriodKey): Promise<BriefResult> {
   if (!aiConfigured()) {
-    const brief = rulesBrief(period);
+    const brief = rulesBrief(store, period);
     return { ...brief, note: "Set ANTHROPIC_API_KEY to have Claude write this brief." };
   }
 
-  const stats = headline(period);
-  const risks = returnRisk(dataset().orders, lateFeeRules, dataset().products);
-  const products = topProducts(period, 6);
-  const customers = topCustomers(period, 5);
-  const mix = categoryMix(period);
-  const quotes = dataset().orders.filter(
+  const stats = headline(store, period);
+  const risks = returnRisk(store.orders, lateFeeRules, store.products);
+  const products = topProducts(store, period, 6);
+  const customers = topCustomers(store, period, 5);
+  const mix = categoryMix(store, period);
+  const quotes = store.orders.filter(
     (o) => o.status === "quotation" || o.status === "quotation_sent",
   );
 
@@ -161,7 +162,7 @@ export async function operatorBrief(period: PeriodKey): Promise<BriefResult> {
 
     return { summary: parsed.summary, items: parsed.items, source: "claude" };
   } catch (error) {
-    const brief = rulesBrief(period);
+    const brief = rulesBrief(store, period);
     return { ...brief, note: describeAiError(error) };
   }
 }

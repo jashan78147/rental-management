@@ -5,7 +5,8 @@ import { CustomerSwitch } from "@/components/portal/customer-switch";
 import { Card, EmptyState, Stat, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { payInvoiceAction } from "@/lib/actions";
 import { profiles } from "@/lib/data/seed";
-import { dataset, profileById } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
+import { loadDataset } from "@/lib/data/persist";
 import { fmtDateFull, money } from "@/lib/format";
 import { firstParam } from "@/lib/window";
 
@@ -20,7 +21,7 @@ export default async function PortalInvoicesPage({ searchParams }: { searchParam
   const customerId = firstParam(params.as) ?? CUSTOMERS[0].id;
   const customer = profileById(customerId) ?? CUSTOMERS[0];
 
-  const store = dataset();
+  const store = await loadDataset();
   const orderIds = new Set(
     store.orders.filter((o) => o.customerId === customer.id).map((o) => o.id),
   );
