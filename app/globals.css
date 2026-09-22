@@ -379,6 +379,49 @@ p {
   }
 }
 
+/* --------------------------------------------------------------------------
+   Entry splash. Painted from the server HTML, so it needs to be able to
+   disappear before first paint when the session has already seen it: the
+   html[data-splash-seen] rule is set by an inline script in the head.
+   -------------------------------------------------------------------------- */
+@keyframes splash-fill {
+  from {
+    transform: scaleX(0.04);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.splash-bar {
+  transform-origin: left center;
+  animation: splash-fill 1000ms var(--ease-out) both;
+}
+
+.splash {
+  transition:
+    opacity 380ms var(--ease-out),
+    visibility 380ms step-end;
+}
+
+/* Faded out by React once the timer elapses. */
+.splash[data-done] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Already seen this session: never render it at all. */
+:root[data-splash-seen] .splash {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .splash {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   .backdrop-blur-sticky {
     backdrop-filter: none;

@@ -6,6 +6,8 @@ import { SiteHeader } from "@/components/site-header";
 import { AccountMenu } from "@/components/account-menu";
 import { SiteFooter } from "@/components/site-footer";
 import { FooterSlot } from "@/components/site-chrome";
+import { AppSplash } from "@/components/app-splash";
+import { SPLASH_KEY } from "@/lib/splash";
 import { currentAccount } from "@/lib/auth/users";
 import { BRAND } from "@/lib/data/seed";
 import "./globals.css";
@@ -52,12 +54,22 @@ export const viewport: Viewport = {
   ],
 };
 
-/** Applies the stored theme before paint so the page never flashes the wrong one. */
-const themeScript = `
+/**
+ * Runs before paint, so the page never flashes the wrong theme and the entry
+ * splash never reappears on a second navigation in the same session. Both have
+ * to happen here rather than in an effect, because by the time React hydrates
+ * the wrong thing has already been painted.
+ */
+const bootScript = `
 try {
   var stored = localStorage.getItem("bandobast-theme");
   if (stored === "dark" || stored === "light") {
     document.documentElement.setAttribute("data-theme", stored);
+  }
+} catch (e) {}
+try {
+  if (sessionStorage.getItem("${SPLASH_KEY}") === "1") {
+    document.documentElement.setAttribute("data-splash-seen", "");
   }
 } catch (e) {}
 `;
@@ -68,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en-IN" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: bootScript }} />
       </head>
       <body
         className={`${bricolage.variable} ${karla.variable} ${mono.variable} antialiased`}
@@ -79,6 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to content
         </a>
+        <AppSplash />
         <NuqsAdapter>
           <CartProvider>
             <SiteHeader
