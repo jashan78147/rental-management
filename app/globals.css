@@ -1,87 +1,110 @@
 @import "tailwindcss";
 
 /* --------------------------------------------------------------------------
-   Tokens. Deep forest green against a cool bone surface, with amber reserved
-   for things that want attention. Green carries the brand and primary actions,
-   teal marks settled or on-time states, amber warns, brick is for failure.
+   Tokens.
+
+   Visual direction follows the Indian rental-commerce convention the brief
+   pointed at: deep navy as the brand and primary action, gold reserved for
+   highlights and offers, warm cream for the soft section bands, white cards
+   lifted off a cool grey page with a soft shadow.
    -------------------------------------------------------------------------- */
 :root {
-  --paper: #f3f5f2;
+  --paper: #f6f7f9;
   --paper-raised: #ffffff;
-  --paper-sunken: #e8ede7;
-  --ink: #10201a;
-  --ink-soft: #4a5a52;
-  --ink-faint: #7a8a81;
-  --line: #dbe3db;
-  --line-strong: #c2cec2;
+  --paper-sunken: #f8f2e7;
+  --ink: #12243a;
+  --ink-soft: #55687d;
+  --ink-faint: #8493a4;
+  --line: #e5e9ef;
+  --line-strong: #cfd7e2;
 
-  --clay: #15503c;
-  --clay-hover: #1b6349;
-  --clay-tint: #e2ede7;
-  --on-clay: #f4f9f6;
+  /* Brand and primary action */
+  --clay: #0e2a47;
+  --clay-hover: #17416b;
+  --clay-tint: #e8eef5;
+  --on-clay: #ffffff;
 
-  --pine: #0f6f63;
-  --pine-tint: #dcefec;
-  --ochre: #a8730a;
-  --ochre-tint: #f7edd6;
-  --rust: #a8372a;
-  --rust-tint: #f7e3e0;
+  /* Highlight, offers, ratings */
+  --gold: #e0a93e;
+  --gold-strong: #a8761a;
+  --on-gold: #2a1d05;
 
-  --ring: #15503c;
+  --pine: #157347;
+  --pine-tint: #e3f2ea;
+  --ochre: #a8761a;
+  --ochre-tint: #fbf0d8;
+  --rust: #b3352b;
+  --rust-tint: #fbe9e7;
+
+  --ring: #0e2a47;
+  --shadow-card: 0 1px 2px rgba(18, 36, 58, 0.04), 0 8px 24px -12px rgba(18, 36, 58, 0.18);
+  --shadow-lift: 0 2px 6px rgba(18, 36, 58, 0.06), 0 18px 40px -18px rgba(18, 36, 58, 0.28);
   color-scheme: light;
 }
 
 :root:not([data-theme="light"]) {
   @media (prefers-color-scheme: dark) {
-    --paper: #0e1613;
-    --paper-raised: #151e1a;
-    --paper-sunken: #0a100d;
-    --ink: #e9efea;
-    --ink-soft: #9cada3;
-    --ink-faint: #6f8279;
-    --line: #232e28;
-    --line-strong: #35443c;
+    --paper: #0a1725;
+    --paper-raised: #10233a;
+    --paper-sunken: #14273d;
+    --ink: #eaf0f7;
+    --ink-soft: #9fb0c4;
+    --ink-faint: #7387a0;
+    --line: #1e3653;
+    --line-strong: #2c4a6e;
 
-    --clay: #56b98c;
-    --clay-hover: #6bc99d;
-    --clay-tint: #14301f;
-    --on-clay: #06140d;
+    --clay: #62a4e8;
+    --clay-hover: #7fb7f0;
+    --clay-tint: #13304c;
+    --on-clay: #071726;
 
-    --pine: #3fb3a4;
-    --pine-tint: #0f2b28;
-    --ochre: #dca93f;
+    --gold: #e6b453;
+    --gold-strong: #e6b453;
+    --on-gold: #241905;
+
+    --pine: #4fbc86;
+    --pine-tint: #11301f;
+    --ochre: #dcab48;
     --ochre-tint: #2c2413;
-    --rust: #e07a6a;
-    --rust-tint: #31191a;
+    --rust: #e4796c;
+    --rust-tint: #33191a;
 
-    --ring: #56b98c;
+    --ring: #62a4e8;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+    --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #0e1613;
-  --paper-raised: #151e1a;
-  --paper-sunken: #0a100d;
-  --ink: #e9efea;
-  --ink-soft: #9cada3;
-  --ink-faint: #6f8279;
-  --line: #232e28;
-  --line-strong: #35443c;
+  --paper: #0a1725;
+  --paper-raised: #10233a;
+  --paper-sunken: #14273d;
+  --ink: #eaf0f7;
+  --ink-soft: #9fb0c4;
+  --ink-faint: #7387a0;
+  --line: #1e3653;
+  --line-strong: #2c4a6e;
 
-  --clay: #56b98c;
-  --clay-hover: #6bc99d;
-  --clay-tint: #14301f;
-  --on-clay: #06140d;
+  --clay: #62a4e8;
+  --clay-hover: #7fb7f0;
+  --clay-tint: #13304c;
+  --on-clay: #071726;
 
-  --pine: #3fb3a4;
-  --pine-tint: #0f2b28;
-  --ochre: #dca93f;
+  --gold: #e6b453;
+  --gold-strong: #e6b453;
+  --on-gold: #241905;
+
+  --pine: #4fbc86;
+  --pine-tint: #11301f;
+  --ochre: #dcab48;
   --ochre-tint: #2c2413;
-  --rust: #e07a6a;
-  --rust-tint: #31191a;
+  --rust: #e4796c;
+  --rust-tint: #33191a;
 
-  --ring: #56b98c;
+  --ring: #62a4e8;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
   color-scheme: dark;
 }
 
@@ -98,6 +121,9 @@
   --color-clay-hover: var(--clay-hover);
   --color-clay-tint: var(--clay-tint);
   --color-on-clay: var(--on-clay);
+  --color-gold: var(--gold);
+  --color-gold-strong: var(--gold-strong);
+  --color-on-gold: var(--on-gold);
   --color-pine: var(--pine);
   --color-pine-tint: var(--pine-tint);
   --color-ochre: var(--ochre);
@@ -109,7 +135,17 @@
   --font-sans: var(--font-karla), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
 
-  --radius-card: 14px;
+  --radius-card: 16px;
+}
+
+/* --------------------------------------------------------------------------
+   Motion tokens. The built-in CSS easings are too weak to read as deliberate,
+   so every transition uses one of these.
+   -------------------------------------------------------------------------- */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* --------------------------------------------------------------------------
@@ -149,7 +185,7 @@ p {
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 [id] {
@@ -162,26 +198,43 @@ p {
 }
 
 /* --------------------------------------------------------------------------
-   Utilities
+   Surfaces
    -------------------------------------------------------------------------- */
 .card {
   background-color: var(--paper-raised);
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
-.hairline {
-  background-image: linear-gradient(to right, transparent, var(--line-strong), transparent);
-  height: 1px;
+/* Cards that respond to the pointer. Transform and shadow only, so the
+   browser composites it without touching layout. */
+.card-hover {
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    border-color 220ms var(--ease-out);
+  will-change: transform;
 }
 
-.grain::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+@media (hover: hover) {
+  .card-hover:hover {
+    transform: translate3d(0, -4px, 0);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+.card-hover:active {
+  transform: translate3d(0, -1px, 0) scale(0.995);
+}
+
+.panel-dark {
+  background-color: #0e2a47;
+  color: #eef3f9;
+}
+
+:root[data-theme="dark"] .panel-dark {
+  background-color: #10233a;
 }
 
 .scrollbar-slim {
@@ -189,14 +242,21 @@ p {
   scrollbar-color: var(--line-strong) transparent;
 }
 
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
-   Motion. Every animation here is transform or opacity only, and every one
-   of them is switched off under prefers-reduced-motion.
+   Motion. Transform and opacity only, and all of it switched off under
+   prefers-reduced-motion.
    -------------------------------------------------------------------------- */
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translate3d(0, 14px, 0);
+    transform: translate3d(0, 16px, 0);
   }
   to {
     opacity: 1;
@@ -222,17 +282,54 @@ p {
   }
 }
 
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
 .animate-rise {
-  animation: rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: rise 620ms var(--ease-out) both;
   will-change: transform, opacity;
 }
 
 .animate-fade {
-  animation: fade 420ms ease-out both;
+  animation: fade 460ms var(--ease-out) both;
 }
 
 .animate-sweep {
-  animation: sweep 1400ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: sweep 1400ms var(--ease-in-out) infinite;
+}
+
+.animate-marquee {
+  animation: marquee 34s linear infinite;
+}
+
+/* Staggered entrance for grids and lists. */
+.stagger > * {
+  animation: rise 560ms var(--ease-out) both;
+}
+.stagger > *:nth-child(1) { animation-delay: 40ms; }
+.stagger > *:nth-child(2) { animation-delay: 90ms; }
+.stagger > *:nth-child(3) { animation-delay: 140ms; }
+.stagger > *:nth-child(4) { animation-delay: 190ms; }
+.stagger > *:nth-child(5) { animation-delay: 240ms; }
+.stagger > *:nth-child(6) { animation-delay: 290ms; }
+.stagger > *:nth-child(n + 7) { animation-delay: 330ms; }
+
+/* Reveal on scroll, driven by the viewport rather than a scroll listener.
+   Where the feature is unsupported the content is simply visible. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      animation: rise linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 26%;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -242,9 +339,17 @@ p {
 
   .animate-rise,
   .animate-fade,
-  .animate-sweep {
+  .animate-sweep,
+  .animate-marquee,
+  .stagger > *,
+  .reveal {
     animation: none !important;
     opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .card-hover:hover,
+  .card-hover:active {
     transform: none !important;
   }
 

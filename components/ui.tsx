@@ -6,15 +6,19 @@ import { cn } from "@/lib/format";
 /* Button                                                                      */
 /* -------------------------------------------------------------------------- */
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "gold" | "ghost" | "danger";
 type ButtonSize = "sm" | "md" | "lg";
 
+// Press feedback is a scale rather than a nudge: it reads as the surface
+// taking the press, and at 120ms it lands inside the window where a button
+// still feels connected to the finger.
 const BUTTON_BASE =
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,border-color,color,transform] duration-150 active:translate-y-px disabled:pointer-events-none disabled:opacity-55";
+  "inline-flex items-center justify-center gap-2 rounded-full font-medium transition-[background-color,border-color,color,transform,box-shadow] duration-150 ease-[var(--ease-out)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-55";
 
 const BUTTON_VARIANT: Record<ButtonVariant, string> = {
-  primary: "bg-clay text-on-clay hover:bg-clay-hover",
+  primary: "bg-clay text-on-clay shadow-sm hover:bg-clay-hover",
   secondary: "border border-line-strong bg-raised text-ink hover:border-clay hover:text-clay",
+  gold: "bg-gold text-on-gold shadow-sm hover:brightness-[1.06]",
   ghost: "text-ink-soft hover:bg-sunken hover:text-ink",
   danger: "border border-rust/40 bg-rust-tint text-rust hover:border-rust",
 };
@@ -100,23 +104,35 @@ export function SectionHeading({
   title,
   body,
   action,
+  align = "start",
   className,
 }: {
   eyebrow?: string;
   title: string;
   body?: string;
   action?: ReactNode;
+  /** Centered headings carry the storefront sections; the console stays left. */
+  align?: "start" | "center";
   className?: string;
 }) {
+  if (align === "center") {
+    return (
+      <div className={cn("mx-auto max-w-2xl text-center", className)}>
+        {eyebrow ? (
+          <p className="mb-2 text-sm font-medium text-ink-faint">{eyebrow}</p>
+        ) : null}
+        <h2 className="font-display text-2xl font-semibold sm:text-3xl lg:text-4xl">{title}</h2>
+        {body ? <p className="mx-auto mt-3 max-w-xl text-ink-soft">{body}</p> : null}
+        {action ? <div className="mt-6 flex justify-center">{action}</div> : null}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("flex flex-wrap items-end justify-between gap-6", className)}>
       <div className="max-w-2xl">
-        {eyebrow ? (
-          <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-clay">
-            {eyebrow}
-          </p>
-        ) : null}
-        <h2 className="text-2xl font-semibold sm:text-3xl">{title}</h2>
+        {eyebrow ? <p className="mb-1.5 text-sm font-medium text-ink-faint">{eyebrow}</p> : null}
+        <h2 className="font-display text-2xl font-semibold sm:text-3xl">{title}</h2>
         {body ? <p className="mt-3 text-ink-soft">{body}</p> : null}
       </div>
       {action}

@@ -106,12 +106,15 @@ export default async function ProductPage({
         </ol>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
-        {/* Left: the thing itself ------------------------------------------ */}
-        <div>
+      <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
+        {/* On a phone the order is image, then price and action, then detail.
+            On desktop the detail column sits left with the rail beside it. */}
+        <div className="order-1 lg:col-start-1 lg:row-start-1">
           <ProductThumb productId={product.id} size="hero" className="border border-line" />
+        </div>
 
-          <Card className="mt-5 p-5">
+        <div className="order-3 lg:col-start-1 lg:row-start-2 lg:mt-5">
+          <Card className="p-5">
             <h2 className="font-display text-lg font-semibold">About this item</h2>
             <p className="mt-2 text-ink-soft">{product.description}</p>
 
@@ -143,8 +146,8 @@ export default async function ProductPage({
           </Card>
         </div>
 
-        {/* Right: the booking rail ------------------------------------------ */}
-        <div className="lg:sticky lg:top-24 lg:self-start">
+        {/* The booking rail -------------------------------------------------- */}
+        <div className="order-2 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24 lg:self-start">
           <div className="flex flex-wrap items-center gap-2">
             {category ? (
               <Link
@@ -279,6 +282,25 @@ export default async function ProductPage({
         </div>
       </div>
 
+      {/* Phone-only action bar, so the price and the button stay reachable. */}
+      <div
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-raised/95 px-4 py-3 backdrop-blur-sticky backdrop-blur-md lg:hidden"
+        style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="tnum font-display text-lg font-semibold leading-none text-ink">
+              {money(windowTotal)}
+            </p>
+            <p className="mt-1 truncate text-xs text-ink-faint">
+              {durationLabel(startsAt, endsAt)}
+              {saving > 0 ? `, saves ${money(saving)}` : ""}
+            </p>
+          </div>
+          <AddToQuote productId={product.id} available={available} label="Add" />
+        </div>
+      </div>
+
       <section className="mt-14">
         <SectionHeading
           title="Availability over the next three weeks"
@@ -330,6 +352,8 @@ export default async function ProductPage({
           </ul>
         </section>
       ) : null}
+
+      <div aria-hidden="true" className="h-20 lg:hidden" />
     </div>
   );
 }
