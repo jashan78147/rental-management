@@ -1,14 +1,22 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUUpLeft, CalendarCheck, Truck } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowRight,
+  ArrowUUpLeft,
+  BellRinging,
+  CalendarCheck,
+  SealCheck,
+  Truck,
+  Wrench,
+} from "@phosphor-icons/react/dist/ssr";
 import { KitFinder } from "@/components/marketing/kit-finder";
 import { RateLadder, type LadderProduct } from "@/components/marketing/rate-ladder";
 import { ProductThumb, categoryGlyph, categoryTone } from "@/components/product-thumb";
 import { ButtonLink, Card, SectionHeading } from "@/components/ui";
-import { BRAND, categories, products } from "@/lib/data/seed";
+import { BRAND, categories, pricelists, products } from "@/lib/data/seed";
 import { loadDataset } from "@/lib/data/persist";
 import { availableUnits } from "@/lib/domain/availability";
 import { headline } from "@/lib/domain/reports";
-import { money, moneyCompact } from "@/lib/format";
+import { fmtDateFull, money, moneyCompact } from "@/lib/format";
 
 const LADDER_PRODUCTS: LadderProduct[] = ["p-fx6", "p-600d", "p-deck", "p-genset"]
   .map((id) => products.find((p) => p.id === id))
@@ -16,6 +24,13 @@ const LADDER_PRODUCTS: LadderProduct[] = ["p-fx6", "p-600d", "p-deck", "p-genset
   .map((p) => ({ id: p.id, name: p.name, rates: p.rates }));
 
 const FEATURED = ["p-fx6", "p-600d", "p-pa", "p-genset", "p-chairs", "p-komodo", "p-tubes", "p-deck"];
+
+const ASSURANCES = [
+  { icon: Wrench, title: "Checked between hires", body: "Every item is tested and logged back in before it goes out again." },
+  { icon: Truck, title: "Collect or delivered", body: "Pick up from the Pune floor, or we run it to site on a pickup document." },
+  { icon: SealCheck, title: "Deposit refunded", body: "Held separately, never billed, released once the item is checked back in." },
+  { icon: BellRinging, title: "Told before it is due", body: "Reminders go out before your return date, so nothing runs late by accident." },
+];
 
 const STAGES = [
   {
@@ -55,6 +70,33 @@ export default async function HomePage() {
       fromDay: Number.isFinite(fromDay) ? fromDay : 0,
     };
   });
+
+  // The storefront "offers" are the real pricelists, described in customer terms.
+  const reference = products.find((p) => p.id === "p-fx6");
+  const standardDay = reference?.rates.day ?? 0;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const offers = pricelists
+    .filter((list) => list.id !== "pl-standard" && list.isActive)
+    .map((list) => {
+      const dayRule = list.rules.find(
+        (r) => r.unit === "day" && r.price > 0 && r.productId === reference?.id,
+      );
+      const discountRule = list.rules.find((r) => r.discountPercent > 0);
+
+      const headline = dayRule && standardDay
+        ? `${Math.round((1 - dayRule.price / standardDay) * 100)}%`
+        : discountRule
+          ? `${discountRule.discountPercent}%`
+          : null;
+
+      const upcoming = Boolean(list.validFrom && today < list.validFrom);
+      const expired = Boolean(list.validTo && today > list.validTo);
+
+      return { list, headline, upcoming, expired };
+    })
+    .filter((offer) => offer.headline !== null && !offer.expired)
+    .slice(0, 3);
 
   const featured = FEATURED.map((id) => products.find((p) => p.id === id))
     .filter((p): p is NonNullable<typeof p> => Boolean(p))
@@ -121,6 +163,23 @@ export default async function HomePage() {
             </ul>
           </div>
         </div>
+      </section>
+
+      {/* Assurances --------------------------------------------------------- */}
+      <section className="border-b border-line bg-sunken">
+        <ul className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:grid-cols-2 sm:px-6 lg:grid-cols-4">
+          {ASSURANCES.map((item) => (
+            <li key={item.title} className="flex items-start gap-3">
+              <span aria-hidden="true" className="mt-0.5 shrink-0 text-clay">
+                <item.icon size={20} weight="duotone" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink">{item.title}</p>
+                <p className="mt-0.5 text-sm text-ink-faint">{item.body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Free this week ---------------------------------------------------- */}
@@ -233,6 +292,38 @@ export default async function HomePage() {
             Corporate agreements, repeat-client cards and seasonal rates layer on top of this, each
             with its own validity window.
           </p>
+
+          {offers.length > 0 ? (
+            <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {offers.map(({ list, headline, upcoming }) => (
+                <li key={list.id}>
+                  <Card className="flex h-full flex-col justify-between gap-4 p-5">
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="tnum font-display text-3xl font-semibold text-clay">
+                          {headline}
+                        </span>
+                        <span className="text-sm text-ink-soft">
+                          {list.segment ? "below standard" : "seasonal rate"}
+                        </span>
+                      </div>
+                      <p className="mt-2 font-medium text-ink">{list.name}</p>
+                      <p className="mt-1 text-sm text-ink-soft">
+                        {list.segment
+                          ? `Applied automatically to ${list.segment} customers at checkout.`
+                          : "Applied automatically to the categories it covers."}
+                      </p>
+                    </div>
+                    <p className="text-xs text-ink-faint">
+                      {list.validFrom && list.validTo
+                        ? `${upcoming ? "From" : "Until"} ${fmtDateFull(upcoming ? list.validFrom : list.validTo)}`
+                        : "Always active"}
+                    </p>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       </section>
 

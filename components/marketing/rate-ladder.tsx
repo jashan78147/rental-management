@@ -30,11 +30,15 @@ function asRules(rates: Partial<Record<DurationUnit, number>>) {
   return out;
 }
 
+function plural(count: number, unit: string): string {
+  return `${count} ${unit}${count === 1 ? "" : "s"}`;
+}
+
 function hoursLabel(hours: number): string {
-  if (hours < 24) return `${hours} hours`;
-  if (hours < 168) return `${Math.round(hours / 24)} days`;
-  if (hours < 720) return `${Math.round(hours / 168)} weeks`;
-  return `${Math.round(hours / 720)} month`;
+  if (hours < 24) return plural(hours, "hour");
+  if (hours < 168) return plural(Math.round(hours / 24), "day");
+  if (hours < 720) return plural(Math.round(hours / 168), "week");
+  return plural(Math.round(hours / 720), "month");
 }
 
 export function RateLadder({ products }: { products: LadderProduct[] }) {
