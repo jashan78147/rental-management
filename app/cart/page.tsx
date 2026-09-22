@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ProductThumb } from "@/components/product-thumb";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Sparkle, Trash, Warning } from "@phosphor-icons/react/dist/ssr";
@@ -186,16 +187,7 @@ export default function CartPage() {
               {(quote?.lines ?? []).map((line) => (
                 <li key={line.productId} className="p-4">
                   <div className="flex gap-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={line.imageUrl}
-                      alt=""
-                      width={72}
-                      height={72}
-                      loading="lazy"
-                      className="h-18 w-18 shrink-0 rounded-lg object-cover"
-                      style={{ height: 72, width: 72 }}
-                    />
+                    <ProductThumb productId={line.productId} size="lg" />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -300,15 +292,7 @@ export default function CartPage() {
               <ul className="divide-y divide-line">
                 {recs.suggestions.map((suggestion) => (
                   <li key={suggestion.productId} className="flex items-center gap-4 p-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={suggestion.imageUrl}
-                      alt=""
-                      width={48}
-                      height={48}
-                      loading="lazy"
-                      className="h-12 w-12 shrink-0 rounded-lg object-cover"
-                    />
+                    <ProductThumb productId={suggestion.productId} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <Link

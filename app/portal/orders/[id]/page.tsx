@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProductThumb } from "@/components/product-thumb";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "@phosphor-icons/react/dist/ssr";
@@ -118,17 +119,7 @@ export default async function PortalOrderPage({
                 const product = productById(line.productId);
                 return (
                   <li key={line.id} className="flex gap-4 px-5 py-4">
-                    {product ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={product.imageUrl}
-                        alt=""
-                        width={64}
-                        height={64}
-                        loading="lazy"
-                        className="h-16 w-16 shrink-0 rounded-lg object-cover"
-                      />
-                    ) : null}
+                    <ProductThumb productId={line.productId} size="lg" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <Link

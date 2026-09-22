@@ -129,11 +129,19 @@ export function Stat({
   value,
   hint,
   tone = "neutral",
+  filled = false,
+  change,
+  changeLabel = "vs previous period",
 }: {
   label: string;
   value: string;
   hint?: string;
   tone?: Tone;
+  /** One card per row may carry the accent fill, to anchor the eye. */
+  filled?: boolean;
+  /** Percent change; null means there is no comparable previous period. */
+  change?: number | null;
+  changeLabel?: string;
 }) {
   const accent =
     tone === "clay"
@@ -146,11 +154,54 @@ export function Stat({
             ? "text-ochre"
             : "text-ink";
 
+  const up = (change ?? 0) >= 0;
+
   return (
-    <div className="card p-4">
-      <p className="text-xs font-medium uppercase tracking-wider text-ink-faint">{label}</p>
-      <p className={cn("tnum mt-2 font-display text-2xl font-semibold", accent)}>{value}</p>
-      {hint ? <p className="mt-1 text-sm text-ink-soft">{hint}</p> : null}
+    <div
+      className={cn(
+        "flex flex-col justify-between gap-5 rounded-[var(--radius-card)] border p-4",
+        filled ? "border-clay bg-clay text-on-clay" : "border-line bg-raised",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p
+          className={cn(
+            "text-xs font-medium uppercase tracking-wider",
+            filled ? "text-on-clay/75" : "text-ink-faint",
+          )}
+        >
+          {label}
+        </p>
+        {change != null ? (
+          <span
+            title={changeLabel}
+            className={cn(
+              "tnum inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+              filled
+                ? "bg-on-clay/15 text-on-clay"
+                : up
+                  ? "bg-pine-tint text-pine"
+                  : "bg-rust-tint text-rust",
+            )}
+          >
+            {up ? "▲" : "▼"} {Math.abs(change)}%
+          </span>
+        ) : null}
+      </div>
+
+      <div>
+        <p
+          className={cn(
+            "tnum font-display text-2xl font-semibold",
+            filled ? "text-on-clay" : accent,
+          )}
+        >
+          {value}
+        </p>
+        {hint ? (
+          <p className={cn("mt-1 text-sm", filled ? "text-on-clay/75" : "text-ink-soft")}>{hint}</p>
+        ) : null}
+      </div>
     </div>
   );
 }

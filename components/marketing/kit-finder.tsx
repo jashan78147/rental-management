@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ProductThumb } from "@/components/product-thumb";
 import { useRef, useState } from "react";
 import { ArrowRight, Plus, Sparkle, Warning } from "@phosphor-icons/react/dist/ssr";
 import { useCart } from "@/components/cart-provider";
@@ -179,15 +180,7 @@ export function KitFinder() {
               <ul className="divide-y divide-line">
                 {result.picks.map((pick) => (
                   <li key={pick.productId} className="flex items-center gap-4 p-4">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={pick.imageUrl}
-                      alt=""
-                      width={56}
-                      height={56}
-                      loading="lazy"
-                      className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                    />
+                    <ProductThumb productId={pick.productId} size="md" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline gap-x-2">
                         <Link

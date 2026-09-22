@@ -74,7 +74,12 @@ export function SiteHeader() {
               <path d="M4 8.5 12 13l8-4.5M12 13v7" strokeLinejoin="round" />
             </svg>
           </span>
-          <span translate="no">{BRAND.name}</span>
+          <span className="flex flex-col leading-none">
+            <span translate="no">{BRAND.name}</span>
+            <span className="mt-0.5 hidden text-[0.7rem] font-normal tracking-wide text-ink-faint sm:block">
+              Equipment hire
+            </span>
+          </span>
         </Link>
 
         <nav aria-label="Primary" className="ml-auto hidden items-center gap-1 md:flex">

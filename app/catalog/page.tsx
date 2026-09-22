@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProductThumb } from "@/components/product-thumb";
 import Link from "next/link";
 import { MagnifyingGlass } from "@phosphor-icons/react/dist/ssr";
 import { AddToQuote } from "@/components/shop/add-to-quote";
@@ -186,15 +187,7 @@ export default async function CatalogPage({ searchParams }: { searchParams: Sear
             <li key={product.id}>
               <Card className="flex h-full flex-col overflow-hidden">
                 <Link href={`/catalog/${product.slug}`} className="group block">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    width={640}
-                    height={480}
-                    loading="lazy"
-                    className="aspect-[4/3] w-full object-cover transition-opacity group-hover:opacity-90"
-                  />
+                  <ProductThumb productId={product.id} size="tile" />
                 </Link>
 
                 <div className="flex flex-1 flex-col p-4">

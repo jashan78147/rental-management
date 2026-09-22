@@ -108,6 +108,41 @@ export function headline(store: Dataset, key: PeriodKey, now: Date = new Date())
   };
 }
 
+export interface Comparison {
+  current: Headline;
+  previous: Headline;
+  /** Percent change against the preceding window of equal length, null when there is no base. */
+  revenueChange: number | null;
+  ordersChange: number | null;
+  quotationChange: number | null;
+}
+
+function percentChange(current: number, previous: number): number | null {
+  if (previous <= 0) return null;
+  return round2(((current - previous) / previous) * 100);
+}
+
+/**
+ * This period against the one immediately before it, so a stat can say which
+ * way it is moving rather than just how big it is.
+ */
+export function compareHeadline(
+  store: Dataset,
+  key: PeriodKey,
+  now: Date = new Date(),
+): Comparison {
+  const current = headline(store, key, now);
+  const previous = headline(store, key, new Date(now.getTime() - periodDays(key) * 86_400_000));
+
+  return {
+    current,
+    previous,
+    revenueChange: percentChange(current.revenue, previous.revenue),
+    ordersChange: percentChange(current.bookedOrders, previous.bookedOrders),
+    quotationChange: percentChange(current.quotationValue, previous.quotationValue),
+  };
+}
+
 export interface ProductRow {
   productId: string;
   name: string;

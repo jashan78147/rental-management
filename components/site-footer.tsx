@@ -39,8 +39,8 @@ export function SiteFooter() {
               {BRAND.name}
             </p>
             <p className="mt-2 max-w-xs text-sm text-ink-soft">
-              {BRAND.tagline} Quotations, reservations, collections and invoicing for a working
-              rental fleet.
+              Camera, lighting, audio, staging and event furniture, hired by the hour, day, week or
+              month across {BRAND.city}, Mumbai and Bengaluru.
             </p>
             <p className="mt-4 text-sm text-ink-faint">
               Ganeshkhind Road, {BRAND.city} 411007

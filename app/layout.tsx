@@ -33,7 +33,7 @@ export const metadata: Metadata = {
     template: `%s | ${BRAND.name}`,
   },
   description:
-    "Quotations, reservations, pickup and return scheduling, flexible invoicing and time-based pricing for a rental fleet, with a customer booking portal.",
+    "Camera, lighting, audio and staging hire. Check live availability for your dates, book online, and collect. Hourly, daily, weekly and monthly rates.",
 };
 
 /**
@@ -44,8 +44,8 @@ export const dynamic = "force-dynamic";
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#141210" },
+    { media: "(prefers-color-scheme: light)", color: "#f3f5f2" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e1613" },
   ],
 };
 
@@ -63,7 +63,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en-IN" suppressHydrationWarning>
       <head>
-        <link rel="preconnect" href="https://picsum.photos" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body

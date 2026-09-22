@@ -36,6 +36,7 @@ export interface Category {
   name: string;
   slug: string;
   blurb?: string;
+  imageUrl?: string;
 }
 
 export interface Product {

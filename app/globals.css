@@ -1,86 +1,87 @@
 @import "tailwindcss";
 
 /* --------------------------------------------------------------------------
-   Tokens. Warm paper and ink with a clay accent, so the console reads as a
-   working tool rather than a dashboard template.
+   Tokens. Deep forest green against a cool bone surface, with amber reserved
+   for things that want attention. Green carries the brand and primary actions,
+   teal marks settled or on-time states, amber warns, brick is for failure.
    -------------------------------------------------------------------------- */
 :root {
-  --paper: #faf7f2;
+  --paper: #f3f5f2;
   --paper-raised: #ffffff;
-  --paper-sunken: #f2ede4;
-  --ink: #191512;
-  --ink-soft: #5c5349;
-  --ink-faint: #8b8175;
-  --line: #e6dfd4;
-  --line-strong: #d3c9ba;
+  --paper-sunken: #e8ede7;
+  --ink: #10201a;
+  --ink-soft: #4a5a52;
+  --ink-faint: #7a8a81;
+  --line: #dbe3db;
+  --line-strong: #c2cec2;
 
-  --clay: #a8441c;
-  --clay-hover: #8d3715;
-  --clay-tint: #f6e7de;
-  --on-clay: #fff8f4;
+  --clay: #15503c;
+  --clay-hover: #1b6349;
+  --clay-tint: #e2ede7;
+  --on-clay: #f4f9f6;
 
-  --pine: #145c52;
-  --pine-tint: #dbeeea;
-  --ochre: #8a660f;
-  --ochre-tint: #f6ecd2;
-  --rust: #9a2b2b;
-  --rust-tint: #f7e2e0;
+  --pine: #0f6f63;
+  --pine-tint: #dcefec;
+  --ochre: #a8730a;
+  --ochre-tint: #f7edd6;
+  --rust: #a8372a;
+  --rust-tint: #f7e3e0;
 
-  --ring: #a8441c;
+  --ring: #15503c;
   color-scheme: light;
 }
 
 :root:not([data-theme="light"]) {
   @media (prefers-color-scheme: dark) {
-    --paper: #141210;
-    --paper-raised: #1c1916;
-    --paper-sunken: #100e0c;
-    --ink: #f5f0e8;
-    --ink-soft: #a59c90;
-    --ink-faint: #7b7367;
-    --line: #2e2924;
-    --line-strong: #453e35;
+    --paper: #0e1613;
+    --paper-raised: #151e1a;
+    --paper-sunken: #0a100d;
+    --ink: #e9efea;
+    --ink-soft: #9cada3;
+    --ink-faint: #6f8279;
+    --line: #232e28;
+    --line-strong: #35443c;
 
-    --clay: #e0763f;
-    --clay-hover: #ef8b56;
-    --clay-tint: #2e1c13;
-    --on-clay: #1a0f08;
+    --clay: #56b98c;
+    --clay-hover: #6bc99d;
+    --clay-tint: #14301f;
+    --on-clay: #06140d;
 
-    --pine: #4fb3a2;
-    --pine-tint: #13302c;
-    --ochre: #d6a93c;
-    --ochre-tint: #2d2513;
-    --rust: #e06a6a;
-    --rust-tint: #33191a;
+    --pine: #3fb3a4;
+    --pine-tint: #0f2b28;
+    --ochre: #dca93f;
+    --ochre-tint: #2c2413;
+    --rust: #e07a6a;
+    --rust-tint: #31191a;
 
-    --ring: #e0763f;
+    --ring: #56b98c;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --paper: #141210;
-  --paper-raised: #1c1916;
-  --paper-sunken: #100e0c;
-  --ink: #f5f0e8;
-  --ink-soft: #a59c90;
-  --ink-faint: #7b7367;
-  --line: #2e2924;
-  --line-strong: #453e35;
+  --paper: #0e1613;
+  --paper-raised: #151e1a;
+  --paper-sunken: #0a100d;
+  --ink: #e9efea;
+  --ink-soft: #9cada3;
+  --ink-faint: #6f8279;
+  --line: #232e28;
+  --line-strong: #35443c;
 
-  --clay: #e0763f;
-  --clay-hover: #ef8b56;
-  --clay-tint: #2e1c13;
-  --on-clay: #1a0f08;
+  --clay: #56b98c;
+  --clay-hover: #6bc99d;
+  --clay-tint: #14301f;
+  --on-clay: #06140d;
 
-  --pine: #4fb3a2;
-  --pine-tint: #13302c;
-  --ochre: #d6a93c;
-  --ochre-tint: #2d2513;
-  --rust: #e06a6a;
-  --rust-tint: #33191a;
+  --pine: #3fb3a4;
+  --pine-tint: #0f2b28;
+  --ochre: #dca93f;
+  --ochre-tint: #2c2413;
+  --rust: #e07a6a;
+  --rust-tint: #31191a;
 
-  --ring: #e0763f;
+  --ring: #56b98c;
   color-scheme: dark;
 }
 

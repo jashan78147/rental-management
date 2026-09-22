@@ -3,14 +3,18 @@ import { Suspense } from "react";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { OperatorBrief, OperatorBriefSkeleton } from "@/components/console/operator-brief";
 import { ActionForm } from "@/components/console/action-form";
+import { RevenueTrendChart } from "@/components/console/report-charts";
+import { ProductThumb } from "@/components/product-thumb";
 import { Badge, Card, EmptyState, Stat, StatusBadge } from "@/components/ui";
 import { resetDemoAction } from "@/lib/actions";
 import { dbConfigured } from "@/lib/db/client";
-import { lateFeeRules, profileById } from "@/lib/data/store";
+import { allProducts, lateFeeRules, profileById } from "@/lib/data/store";
+import { products as productSeeds } from "@/lib/data/seed";
 import { loadDataset } from "@/lib/data/persist";
+import { availableUnits } from "@/lib/domain/availability";
 import { returnRisk } from "@/lib/domain/fees";
-import { headline, PERIODS, type PeriodKey } from "@/lib/domain/reports";
-import { fmtDateTime, money, moneyCompact, relativeTime } from "@/lib/format";
+import { compareHeadline, PERIODS, revenueTrend, type PeriodKey } from "@/lib/domain/reports";
+import { fmtDate, money, moneyCompact, relativeTime } from "@/lib/format";
 import { firstParam } from "@/lib/window";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -21,19 +25,28 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
     "90d") as PeriodKey;
 
   const store = await loadDataset();
-  const stats = headline(store, period);
+  const comparison = compareHeadline(store, period);
+  const stats = comparison.current;
+  const trend = revenueTrend(store, period);
   const risks = returnRisk(store.orders, lateFeeRules, store.products);
 
-  const now = Date.now();
-  const upcoming = store.deliveries
-    .filter((d) => d.status === "scheduled" || d.status === "ready")
-    .filter((d) => new Date(d.scheduledAt).getTime() < now + 7 * 86_400_000)
-    .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
-    .slice(0, 6);
+  const now = new Date();
+  const weekOut = new Date(now.getTime() + 7 * 86_400_000);
 
-  const openQuotes = store.orders
-    .filter((o) => o.status === "quotation" || o.status === "quotation_sent")
-    .sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
+  // What the desk could still sell this week, tightest first.
+  const availability = allProducts
+    .map((product) => ({
+      product,
+      free: availableUnits(product, store.reservations, now.toISOString(), weekOut.toISOString()),
+      dayRate: productSeeds.find((p) => p.id === product.id)?.rates.day ?? 0,
+    }))
+    .sort((a, b) => a.free / a.product.totalUnits - b.free / b.product.totalUnits)
+    .slice(0, 5);
+
+  const recent = store.orders
+    .slice()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 6);
 
   return (
     <div>
@@ -61,23 +74,28 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
         </nav>
       </header>
 
+      {/* Headline numbers -------------------------------------------------- */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
+          filled
           label="Booked revenue"
           value={moneyCompact(stats.revenue)}
-          hint={`${stats.bookedOrders} orders`}
+          hint={`${stats.bookedOrders} orders confirmed or out`}
+          change={comparison.revenueChange}
         />
         <Stat
           label="Open quotations"
           value={moneyCompact(stats.quotationValue)}
           hint={`${stats.quotationCount} awaiting confirmation`}
           tone="ochre"
+          change={comparison.quotationChange}
         />
         <Stat
           label="Units on hire"
           value={String(stats.unitsOnHire)}
           hint={`${stats.utilisation}% of the fleet that moved`}
           tone="clay"
+          change={comparison.ordersChange}
         />
         <Stat
           label="Returned on time"
@@ -87,7 +105,65 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
         />
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_1fr] xl:items-start">
+      {/* Trend plus what is still sellable ---------------------------------- */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.55fr_1fr] xl:items-start">
+        <Card className="p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold">Revenue over the period</h2>
+              <p className="mt-1 text-sm text-ink-soft">
+                Confirmed, out and returned orders, bucketed by pickup date.
+              </p>
+            </div>
+            <Link
+              href={`/console/reports?period=${period}`}
+              className="inline-flex items-center gap-1 text-sm text-clay transition-colors hover:text-clay-hover"
+            >
+              Full reports
+              <ArrowRight size={14} weight="bold" aria-hidden="true" />
+            </Link>
+          </div>
+          <div className="mt-4">
+            <RevenueTrendChart data={trend} />
+          </div>
+        </Card>
+
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <h2 className="font-display font-semibold">Tightest stock this week</h2>
+            <Link
+              href="/console/products"
+              className="inline-flex items-center gap-1 text-sm text-clay transition-colors hover:text-clay-hover"
+            >
+              Fleet
+              <ArrowRight size={14} weight="bold" aria-hidden="true" />
+            </Link>
+          </div>
+
+          <ul className="divide-y divide-line">
+            {availability.map(({ product, free, dayRate }) => (
+              <li key={product.id} className="flex items-center gap-3 px-5 py-3">
+                <ProductThumb productId={product.id} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/catalog/${product.slug}`}
+                    className="block truncate font-medium text-ink transition-colors hover:text-clay"
+                  >
+                    {product.name}
+                  </Link>
+                  <p className="tnum text-sm text-ink-faint">{money(dayRate)} a day</p>
+                </div>
+                <Badge tone={free === 0 ? "rust" : free <= 2 ? "ochre" : "pine"}>
+                  {free === 0 ? "Fully booked" : `${free} of ${product.totalUnits} free`}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      {/* Brief plus return risk --------------------------------------------- */}
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_1fr] xl:items-start">
         <Suspense fallback={<OperatorBriefSkeleton />}>
           <OperatorBrief store={store} period={period} />
         </Suspense>
@@ -97,7 +173,7 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
             <h2 className="font-display font-semibold">Return risk</h2>
             <Link
               href="/console/schedule"
-              className="inline-flex items-center gap-1 text-sm text-clay hover:text-clay-hover"
+              className="inline-flex items-center gap-1 text-sm text-clay transition-colors hover:text-clay-hover"
             >
               Collections
               <ArrowRight size={14} weight="bold" aria-hidden="true" />
@@ -131,7 +207,7 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
                       </Badge>
                       <p className="tnum mt-1 text-xs text-ink-faint">
                         {order ? relativeTime(order.endsAt) : ""}
-                        {risk.projectedFee > 0 ? ` , ${money(risk.projectedFee)} fees` : ""}
+                        {risk.projectedFee > 0 ? `, ${money(risk.projectedFee)} fees` : ""}
                       </p>
                     </div>
                   </li>
@@ -142,89 +218,68 @@ export default async function ConsoleDashboard({ searchParams }: { searchParams:
         </Card>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-2 xl:items-start">
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <h2 className="font-display font-semibold">Next seven days</h2>
-            <span className="text-sm text-ink-faint">Pickups and returns</span>
-          </div>
+      {/* Recent bookings ----------------------------------------------------- */}
+      <Card className="mt-4 overflow-hidden">
+        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
+          <h2 className="font-display font-semibold">Latest bookings</h2>
+          <Link
+            href="/console/orders"
+            className="inline-flex items-center gap-1 text-sm text-clay transition-colors hover:text-clay-hover"
+          >
+            All orders
+            <ArrowRight size={14} weight="bold" aria-hidden="true" />
+          </Link>
+        </div>
 
-          {upcoming.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-ink-soft">
-              No movements scheduled this week.
-            </p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {upcoming.map((delivery) => {
-                const order = store.orders.find((o) => o.id === delivery.orderId);
-                return (
-                  <li key={delivery.id} className="flex items-center gap-3 px-5 py-3">
-                    <Badge tone={delivery.kind === "pickup" ? "clay" : "pine"}>
-                      {delivery.kind === "pickup" ? "Out" : "Back"}
-                    </Badge>
-                    <div className="min-w-0 flex-1">
+        {recent.length === 0 ? (
+          <EmptyState title="No bookings yet" body="Quotations will appear here as they come in." />
+        ) : (
+          <div className="overflow-x-auto scrollbar-slim">
+            <table className="w-full min-w-[46rem] text-sm">
+              <caption className="sr-only">Most recent rental orders</caption>
+              <thead>
+                <tr className="border-b border-line text-left text-xs uppercase tracking-wider text-ink-faint">
+                  <th scope="col" className="px-5 py-3 font-medium">Reference</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Customer</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Status</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Out</th>
+                  <th scope="col" className="px-4 py-3 font-medium">Back</th>
+                  <th scope="col" className="px-4 py-3 text-right font-medium">Value</th>
+                  <th scope="col" className="px-5 py-3 text-right font-medium">
+                    <span className="sr-only">Open</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {recent.map((order) => (
+                  <tr key={order.id} className="transition-colors hover:bg-sunken">
+                    <td className="px-5 py-3 font-mono font-medium">{order.reference}</td>
+                    <td className="px-4 py-3 text-ink-soft">
+                      {profileById(order.customerId)?.fullName}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={order.status} />
+                    </td>
+                    <td className="tnum px-4 py-3 text-ink-soft">{fmtDate(order.startsAt)}</td>
+                    <td className="tnum px-4 py-3 text-ink-soft">{fmtDate(order.endsAt)}</td>
+                    <td className="tnum px-4 py-3 text-right font-medium">{money(order.total)}</td>
+                    <td className="px-5 py-3 text-right">
                       <Link
-                        href={`/console/orders/${delivery.orderId}`}
-                        className="font-mono text-sm font-medium transition-colors hover:text-clay"
+                        href={`/console/orders/${order.id}`}
+                        className="inline-flex h-8 items-center rounded-lg bg-clay px-3 text-xs font-medium text-on-clay transition-colors hover:bg-clay-hover"
                       >
-                        {delivery.documentNo}
+                        Details
                       </Link>
-                      <p className="truncate text-sm text-ink-soft">
-                        {order ? profileById(order.customerId)?.fullName : ""} , {delivery.address}
-                      </p>
-                    </div>
-                    <p className="tnum shrink-0 text-right text-sm text-ink-soft">
-                      {fmtDateTime(delivery.scheduledAt)}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-
-        <Card className="overflow-hidden">
-          <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-            <h2 className="font-display font-semibold">Quotations to chase</h2>
-            <Link
-              href="/console/orders?status=quotation_sent"
-              className="inline-flex items-center gap-1 text-sm text-clay hover:text-clay-hover"
-            >
-              All orders
-              <ArrowRight size={14} weight="bold" aria-hidden="true" />
-            </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
+        )}
+      </Card>
 
-          {openQuotes.length === 0 ? (
-            <EmptyState title="Nothing open" body="Every quotation has been confirmed or closed." />
-          ) : (
-            <ul className="divide-y divide-line">
-              {openQuotes.slice(0, 6).map((order) => (
-                <li key={order.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/console/orders/${order.id}`}
-                      className="font-mono text-sm font-medium transition-colors hover:text-clay"
-                    >
-                      {order.reference}
-                    </Link>
-                    <p className="truncate text-sm text-ink-soft">
-                      {profileById(order.customerId)?.fullName} , starts{" "}
-                      {relativeTime(order.startsAt)}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="tnum font-medium">{money(order.total)}</p>
-                    <StatusBadge status={order.status} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
-
-      <Card className="mt-6 flex flex-wrap items-center justify-between gap-4 p-5">
+      <Card className="mt-4 flex flex-wrap items-center justify-between gap-4 p-5">
         <div>
           <h2 className="font-display font-semibold">Demo data</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-soft">

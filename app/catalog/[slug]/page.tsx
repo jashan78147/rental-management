@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ProductThumb } from "@/components/product-thumb";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
@@ -82,15 +83,7 @@ export default async function ProductPage({
 
       <div className="mt-6 grid gap-10 lg:grid-cols-[1.1fr_1fr]">
         <div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={product.imageUrl}
-            alt={product.name}
-            width={900}
-            height={675}
-            fetchPriority="high"
-            className="aspect-[4/3] w-full rounded-2xl border border-line object-cover"
-          />
+          <ProductThumb productId={product.id} size="hero" className="border border-line" />
 
           <Card className="mt-5 p-5">
             <h2 className="font-display text-lg font-semibold">Specification</h2>
@@ -232,15 +225,7 @@ export default async function ProductPage({
               <li key={item.productId}>
                 <Card className="flex h-full flex-col overflow-hidden">
                   <Link href={`/catalog/${item.slug}`}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      width={480}
-                      height={360}
-                      loading="lazy"
-                      className="aspect-[4/3] w-full object-cover"
-                    />
+                    <ProductThumb productId={item.productId} size="tile" />
                   </Link>
                   <div className="flex flex-1 flex-col p-4">
                     <Link
