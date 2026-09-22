@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { paymentsConfigured } from "@/lib/payments/razorpay";
+import { PayButton } from "@/components/portal/pay-button";
 import { ProductThumb } from "@/components/product-thumb";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -246,13 +248,17 @@ export default async function PortalOrderPage({
 
                     {invoice.status !== "paid" ? (
                       <div className="mt-3">
-                        <ActionForm
-                          action={payInvoiceAction}
-                          label={`Pay ${money(invoice.amount)}`}
-                          pendingLabel="Taking payment…"
-                          size="sm"
-                          fields={{ invoiceId: invoice.id }}
-                        />
+                        {paymentsConfigured() ? (
+                          <PayButton invoiceId={invoice.id} amount={invoice.amount} />
+                        ) : (
+                          <ActionForm
+                            action={payInvoiceAction}
+                            label={`Pay ${money(invoice.amount)}`}
+                            pendingLabel="Taking payment…"
+                            size="sm"
+                            fields={{ invoiceId: invoice.id }}
+                          />
+                        )}
                       </div>
                     ) : null}
                   </li>

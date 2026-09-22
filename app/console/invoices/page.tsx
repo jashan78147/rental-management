@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { paymentsConfigured } from "@/lib/payments/razorpay";
 import Link from "next/link";
 import { ActionForm } from "@/components/console/action-form";
 import { Badge, Card, EmptyState, Stat, StatusBadge, INVOICE_KIND_LABEL } from "@/components/ui";
 import { payInvoiceAction } from "@/lib/actions";
-import { profileById, settings } from "@/lib/data/store";
+import { profileById } from "@/lib/data/store";
 import { loadDataset } from "@/lib/data/persist";
 import { fmtDateFull, money, moneyCompact } from "@/lib/format";
 import { firstParam } from "@/lib/window";
@@ -182,17 +183,15 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
       <Card className="mt-8 p-5">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-display font-semibold">Payment gateway</h2>
-          <Badge tone="clay">{settings.gateway}</Badge>
-          <Badge>Test mode</Badge>
+          <Badge tone={paymentsConfigured() ? "pine" : "neutral"}>
+            {paymentsConfigured() ? "Razorpay connected" : "Not connected"}
+          </Badge>
+          {paymentsConfigured() ? <Badge tone="ochre">Test mode</Badge> : null}
         </div>
         <p className="mt-2 max-w-3xl text-sm text-ink-soft">
-          Customers pay their own invoices from the portal without the desk having to chase a
-          transfer. Taking a payment here records it against the invoice with a gateway reference,
-          the same shape the live webhook writes. Set{" "}
-          <code className="rounded bg-sunken px-1.5 py-0.5 font-mono text-xs" translate="no">
-            STRIPE_SECRET_KEY
-          </code>{" "}
-          to switch this from recorded payments to real charges.
+          {paymentsConfigured()
+            ? "Customers pay their own invoices from the portal by UPI, card, netbanking or wallet. The result is verified against the gateway signature before an invoice is marked paid, and a webhook settles it even if the customer closes the tab mid-payment."
+            : "Customers can settle invoices from the portal, but no gateway is connected, so taking a payment records it against the invoice rather than charging anyone. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to turn on UPI, cards and netbanking."}
         </p>
       </Card>
     </div>

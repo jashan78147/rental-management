@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { paymentsConfigured } from "@/lib/payments/razorpay";
+import { PayButton } from "@/components/portal/pay-button";
 import Link from "next/link";
 import { ActionForm } from "@/components/console/action-form";
 import { CustomerSwitch } from "@/components/portal/customer-switch";
@@ -103,13 +105,21 @@ export default async function PortalInvoicesPage({ searchParams }: { searchParam
                   </div>
 
                   {invoice.status !== "paid" ? (
-                    <ActionForm
-                      action={payInvoiceAction}
-                      label="Pay now"
-                      pendingLabel="Taking payment…"
-                      size="sm"
-                      fields={{ invoiceId: invoice.id }}
-                    />
+                    paymentsConfigured() ? (
+                      <PayButton
+                        invoiceId={invoice.id}
+                        amount={invoice.amount}
+                        label="Pay now"
+                      />
+                    ) : (
+                      <ActionForm
+                        action={payInvoiceAction}
+                        label="Pay now"
+                        pendingLabel="Taking payment…"
+                        size="sm"
+                        fields={{ invoiceId: invoice.id }}
+                      />
+                    )
                   ) : null}
                 </li>
               );
