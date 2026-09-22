@@ -161,94 +161,112 @@ async function bootstrap(): Promise<void> {
   await seed();
 }
 
+/**
+ * Multi-row insert in a single statement.
+ *
+ * The HTTP driver costs a round trip per query, so seeding row by row meant
+ * hundreds of sequential trips and a first request slow enough to time out.
+ * One statement per table brings that down to eight.
+ */
+async function bulkInsert(
+  table: string,
+  columns: string[],
+  rows: unknown[][],
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  const width = columns.length;
+  const tuples = rows
+    .map(
+      (_, rowIndex) =>
+        `(${columns.map((_, col) => `$${rowIndex * width + col + 1}`).join(",")})`,
+    )
+    .join(",");
+
+  await sql().query(
+    `insert into ${table} (${columns.join(",")}) values ${tuples} on conflict (id) do nothing`,
+    rows.flat(),
+  );
+}
+
 /** Write the generated demo dataset into an empty database. */
 export async function seed(): Promise<void> {
   const data = buildSeedDataset();
-  const db = sql();
 
-  for (const order of data.orders) {
-    await db.query(
-      `insert into orders (id, reference, customer_id, status, starts_at, ends_at, pricelist_id,
-         subtotal, discount_total, tax_total, deposit_total, late_fee_total, total, notes,
-         created_at, confirmed_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
-       on conflict (id) do nothing`,
-      [
-        order.id, order.reference, order.customerId, order.status, order.startsAt, order.endsAt,
-        order.pricelistId ?? null, order.subtotal, order.discountTotal, order.taxTotal,
-        order.depositTotal, order.lateFeeTotal, order.total, order.notes ?? null,
-        order.createdAt, order.confirmedAt ?? null,
-      ],
-    );
+  await bulkInsert(
+    "orders",
+    ["id", "reference", "customer_id", "status", "starts_at", "ends_at", "pricelist_id",
+     "subtotal", "discount_total", "tax_total", "deposit_total", "late_fee_total", "total",
+     "notes", "created_at", "confirmed_at"],
+    data.orders.map((o) => [
+      o.id, o.reference, o.customerId, o.status, o.startsAt, o.endsAt, o.pricelistId ?? null,
+      o.subtotal, o.discountTotal, o.taxTotal, o.depositTotal, o.lateFeeTotal, o.total,
+      o.notes ?? null, o.createdAt, o.confirmedAt ?? null,
+    ]),
+  );
 
-    for (const [index, line] of order.lines.entries()) {
-      await db.query(
-        `insert into order_lines (id, order_id, product_id, quantity, unit, duration_qty,
-           unit_price, discount, line_total, breakdown, position)
-         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) on conflict (id) do nothing`,
-        [
-          line.id, line.orderId, line.productId, line.quantity, line.unit, line.durationQty,
-          line.unitPrice, line.discount, line.lineTotal, JSON.stringify(line.breakdown), index,
-        ],
-      );
-    }
-  }
+  await bulkInsert(
+    "order_lines",
+    ["id", "order_id", "product_id", "quantity", "unit", "duration_qty", "unit_price",
+     "discount", "line_total", "breakdown", "position"],
+    data.orders.flatMap((o) =>
+      o.lines.map((l, index) => [
+        l.id, l.orderId, l.productId, l.quantity, l.unit, l.durationQty, l.unitPrice,
+        l.discount, l.lineTotal, JSON.stringify(l.breakdown), index,
+      ]),
+    ),
+  );
 
-  for (const r of data.reservations) {
-    await db.query(
-      `insert into reservations (id, order_id, product_id, quantity, starts_at, ends_at, status)
-       values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
-      [r.id, r.orderId, r.productId, r.quantity, r.startsAt, r.endsAt, r.status],
-    );
-  }
+  await bulkInsert(
+    "reservations",
+    ["id", "order_id", "product_id", "quantity", "starts_at", "ends_at", "status"],
+    data.reservations.map((r) => [
+      r.id, r.orderId, r.productId, r.quantity, r.startsAt, r.endsAt, r.status,
+    ]),
+  );
 
-  for (const d of data.deliveries) {
-    await db.query(
-      `insert into deliveries (id, order_id, kind, document_no, scheduled_at, completed_at,
-         status, address, handler, notes)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (id) do nothing`,
-      [
-        d.id, d.orderId, d.kind, d.documentNo, d.scheduledAt, d.completedAt ?? null,
-        d.status, d.address ?? null, d.handler ?? null, d.notes ?? null,
-      ],
-    );
-  }
+  await bulkInsert(
+    "deliveries",
+    ["id", "order_id", "kind", "document_no", "scheduled_at", "completed_at", "status",
+     "address", "handler", "notes"],
+    data.deliveries.map((d) => [
+      d.id, d.orderId, d.kind, d.documentNo, d.scheduledAt, d.completedAt ?? null, d.status,
+      d.address ?? null, d.handler ?? null, d.notes ?? null,
+    ]),
+  );
 
-  for (const i of data.invoices) {
-    await db.query(
-      `insert into invoices (id, order_id, number, kind, amount, status, due_date, issued_at, paid_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict (id) do nothing`,
-      [i.id, i.orderId, i.number, i.kind, i.amount, i.status, i.dueDate ?? null, i.issuedAt, i.paidAt ?? null],
-    );
-  }
+  await bulkInsert(
+    "invoices",
+    ["id", "order_id", "number", "kind", "amount", "status", "due_date", "issued_at", "paid_at"],
+    data.invoices.map((i) => [
+      i.id, i.orderId, i.number, i.kind, i.amount, i.status, i.dueDate ?? null, i.issuedAt,
+      i.paidAt ?? null,
+    ]),
+  );
 
-  for (const p of data.payments) {
-    await db.query(
-      `insert into payments (id, invoice_id, amount, gateway, gateway_payment_id, status, paid_at)
-       values ($1,$2,$3,$4,$5,$6,$7) on conflict (id) do nothing`,
-      [p.id, p.invoiceId, p.amount, p.gateway, p.gatewayPaymentId ?? null, p.status, p.paidAt],
-    );
-  }
+  await bulkInsert(
+    "payments",
+    ["id", "invoice_id", "amount", "gateway", "gateway_payment_id", "status", "paid_at"],
+    data.payments.map((p) => [
+      p.id, p.invoiceId, p.amount, p.gateway, p.gatewayPaymentId ?? null, p.status, p.paidAt,
+    ]),
+  );
 
-  for (const n of data.notifications) {
-    await db.query(
-      `insert into notifications (id, rule_id, order_id, audience, channel, subject, body,
-         scheduled_for, sent_at, status)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) on conflict (id) do nothing`,
-      [
-        n.id, n.ruleId ?? null, n.orderId, n.audience, n.channel, n.subject, n.body,
-        n.scheduledFor, n.sentAt ?? null, n.status,
-      ],
-    );
-  }
+  await bulkInsert(
+    "notifications",
+    ["id", "rule_id", "order_id", "audience", "channel", "subject", "body", "scheduled_for",
+     "sent_at", "status"],
+    data.notifications.map((n) => [
+      n.id, n.ruleId ?? null, n.orderId, n.audience, n.channel, n.subject, n.body,
+      n.scheduledFor, n.sentAt ?? null, n.status,
+    ]),
+  );
 
-  for (const rule of ruleSeeds) {
-    await db.query(
-      `insert into reminder_rules (id, lead_days, is_active) values ($1,$2,$3)
-       on conflict (id) do nothing`,
-      [rule.id, rule.leadDays, rule.isActive],
-    );
-  }
+  await bulkInsert(
+    "reminder_rules",
+    ["id", "lead_days", "is_active"],
+    ruleSeeds.map((rule) => [rule.id, rule.leadDays, rule.isActive]),
+  );
 }
 
 export async function ensureReady(): Promise<void> {
