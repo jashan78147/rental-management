@@ -41,11 +41,8 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
         </p>
 
         <div className="animate-rise relative my-10 hidden max-w-lg lg:my-0 lg:block">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-gold">
-            Rental operations
-          </p>
           {/* A strapline, not the page heading: the form owns that. */}
-          <p className="mt-4 font-display text-4xl font-semibold leading-[1.1] tracking-[-0.022em] text-white lg:text-5xl">
+          <p className="font-display text-4xl font-semibold leading-[1.1] tracking-[-0.022em] text-white lg:text-5xl">
             Camera, lighting, audio and staging, on hire.
           </p>
           <p className="mt-5 text-white/70">

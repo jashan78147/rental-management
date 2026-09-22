@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -13,7 +14,7 @@ import {
 import { KitFinder } from "@/components/marketing/kit-finder";
 import { Rail } from "@/components/marketing/rail";
 import { RateLadder, type LadderProduct } from "@/components/marketing/rate-ladder";
-import { ProductThumb, categoryGlyph, categoryTone } from "@/components/product-thumb";
+import { CategoryThumb, ProductThumb } from "@/components/product-thumb";
 import { AddToQuote } from "@/components/shop/add-to-quote";
 import { ButtonLink, Card, SectionHeading } from "@/components/ui";
 import { categories, pricelists, products } from "@/lib/data/seed";
@@ -145,10 +146,20 @@ export default async function HomePage() {
     <>
       {/* Hero ---------------------------------------------------------------- */}
       <section className="px-4 pt-4 sm:px-6">
-        <div className="panel-dark relative mx-auto max-w-7xl overflow-hidden rounded-[28px] px-6 py-12 sm:px-12 sm:py-16 lg:px-16 lg:py-20">
+        <div className="photo-band photo-band--drift mx-auto max-w-7xl rounded-[28px] px-6 py-14 sm:px-12 sm:py-20 lg:px-16 lg:py-24">
+          {/* A crew rigging a light. It is a backdrop for the headline, never
+              content, so it carries no alt text and sits under a scrim that
+              holds the body copy well clear of the contrast floor. */}
+          <Image
+            src="/catalog/hero-rig.jpg"
+            alt=""
+            fill
+            priority
+            sizes="(max-width: 1280px) 100vw, 1280px"
+          />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold/10 blur-3xl"
+            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-gold/20 blur-3xl"
           />
           <div className="animate-rise relative max-w-2xl">
             <h1 className="font-display text-4xl font-semibold leading-[1.06] text-white sm:text-5xl lg:text-6xl">
@@ -191,16 +202,28 @@ export default async function HomePage() {
 
           <ul className="stagger scrollbar-none -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-6">
             {categoryCards.map((category) => (
-              <li key={category.id} className="w-32 shrink-0 snap-start sm:w-auto">
+              <li key={category.id} className="w-40 shrink-0 snap-start sm:w-auto">
                 <Link href={`/catalog?category=${category.id}`} className="group block h-full">
-                  <Card className="card-hover flex h-full flex-col items-center gap-3 p-4 text-center group-hover:border-clay">
-                    <span
-                      aria-hidden="true"
-                      className={`grid h-14 w-14 place-items-center rounded-full ${categoryTone(category.id)}`}
-                    >
-                      {categoryGlyph(category.id, 26)}
-                    </span>
-                    <span className="min-w-0">
+                  <Card className="card-hover flex h-full flex-col overflow-hidden p-0 group-hover:border-clay">
+                    {/* The photo is decorative: the card is already labelled
+                        by its name, so a description here would just be read
+                        out twice. Categories without one fall back to the
+                        drawing. */}
+                    {category.imageUrl ? (
+                      <span className="photo-chip block aspect-[16/11] w-full">
+                        <Image
+                          src={category.imageUrl}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 160px, (max-width: 1024px) 33vw, 17vw"
+                        />
+                      </span>
+                    ) : (
+                      <CategoryThumb categoryId={category.id} className="aspect-[16/11] w-full" />
+                    )}
+                    {/* Names run to one or two lines; pinning the rate to the bottom keeps
+                        the row of prices on one line across the strip. */}
+                    <span className="flex flex-1 flex-col justify-between gap-1 px-3 py-3 text-center">
                       <span className="block text-sm font-medium leading-tight text-ink">
                         {category.name}
                       </span>

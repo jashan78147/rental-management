@@ -39,6 +39,13 @@
   --ring: #0e2a47;
   --shadow-card: 0 1px 2px rgba(18, 36, 58, 0.04), 0 8px 24px -12px rgba(18, 36, 58, 0.18);
   --shadow-lift: 0 2px 6px rgba(18, 36, 58, 0.06), 0 18px 40px -18px rgba(18, 36, 58, 0.28);
+
+  /* Page surface: washes and the hairline grid. */
+  --wash-warm: rgba(224, 169, 62, 0.13);
+  --wash-cool: rgba(14, 42, 71, 0.07);
+  --grid-line: rgba(18, 36, 58, 0.032);
+  --plate-light: rgba(255, 255, 255, 0.72);
+  --plate-dot: rgba(18, 36, 58, 0.07);
   color-scheme: light;
 }
 
@@ -72,6 +79,12 @@
     --ring: #62a4e8;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
     --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+    
+    --wash-warm: rgba(230, 180, 83, 0.09);
+    --wash-cool: rgba(98, 164, 232, 0.08);
+    --grid-line: rgba(255, 255, 255, 0.028);
+    --plate-light: rgba(255, 255, 255, 0.05);
+    --plate-dot: rgba(255, 255, 255, 0.05);
     color-scheme: dark;
   }
 }
@@ -105,6 +118,12 @@
   --ring: #62a4e8;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.6);
   --shadow-lift: 0 2px 6px rgba(0, 0, 0, 0.35), 0 18px 40px -18px rgba(0, 0, 0, 0.7);
+  
+  --wash-warm: rgba(230, 180, 83, 0.09);
+  --wash-cool: rgba(98, 164, 232, 0.08);
+  --grid-line: rgba(255, 255, 255, 0.028);
+  --plate-light: rgba(255, 255, 255, 0.05);
+  --plate-dot: rgba(255, 255, 255, 0.05);
   color-scheme: dark;
 }
 
@@ -143,7 +162,7 @@
    so every transition uses one of these.
    -------------------------------------------------------------------------- */
 :root {
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -160,13 +179,42 @@ html {
   scroll-behavior: smooth;
 }
 
+/* The page is a surface, not a swatch: a cool wash from the top left and a
+   warm one from the right, both far below the threshold where they read as
+   colour, plus a hairline grid that only shows up on large empty areas. Fixed
+   attachment so it behaves like a backdrop the content moves over. */
 body {
   background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+    radial-gradient(60rem 40rem at 88% -10%, var(--wash-warm), transparent 60%),
+    radial-gradient(52rem 36rem at 6% 4%, var(--wash-cool), transparent 58%);
+  background-size:
+    72px 72px,
+    72px 72px,
+    100% 100%,
+    100% 100%;
+  background-attachment: fixed;
   color: var(--ink);
   font-family: var(--font-sans);
   font-feature-settings: "kern", "liga";
   touch-action: manipulation;
   overflow-x: hidden;
+}
+
+/* Browser chrome we did not draw but still own. */
+::selection {
+  background-color: var(--gold);
+  color: var(--on-gold);
+}
+
+html {
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+:where(input, textarea, [contenteditable]) {
+  caret-color: var(--clay);
 }
 
 h1,
@@ -368,7 +416,9 @@ p {
   }
 
   .card-hover:hover,
-  .card-hover:active {
+  .card-hover:active,
+  .gear-drawing,
+  .photo-chip > img {
     transform: none !important;
   }
 
@@ -376,6 +426,130 @@ p {
   *::before,
   *::after {
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Gear plates.
+
+   A catalog tile is a lit product plate rather than a coloured square: a
+   highlight falling from the top left, a fine dot field for texture, and the
+   drawing floating above both. The drawing lifts on hover, which is the one
+   place motion carries meaning here, picking the item up off the shelf.
+   -------------------------------------------------------------------------- */
+.gear-plate {
+  isolation: isolate;
+}
+
+.gear-field {
+  background-image:
+    radial-gradient(var(--plate-dot) 1px, transparent 1px),
+    radial-gradient(120% 90% at 22% 0%, var(--plate-light), transparent 62%);
+  background-size:
+    14px 14px,
+    100% 100%;
+  pointer-events: none;
+}
+
+.gear-drawing {
+  transition:
+    transform 420ms var(--ease-out),
+    filter 420ms var(--ease-out);
+  will-change: transform;
+}
+
+@media (hover: hover) {
+  .card-hover:hover .gear-drawing,
+  .group\/plate:hover .gear-drawing,
+  a:hover .gear-drawing {
+    transform: translate3d(0, -5px, 0) scale(1.04);
+    filter: drop-shadow(0 10px 14px rgba(18, 36, 58, 0.16));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Photographic bands. The image is a backdrop for text, so it always sits
+   under a scrim heavy enough to keep body copy above 4.5:1.
+   -------------------------------------------------------------------------- */
+.photo-band {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-color: #0e2a47;
+}
+
+.photo-band > img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  object-position: 68% 42%;
+  z-index: -2;
+}
+
+/* A very slow drift across the hero still. It is the one ambient motion on
+   the page: long enough that it is never caught moving, short enough that the
+   frame is not the same one on the way back down. */
+@keyframes drift {
+  from {
+    transform: scale(1.06) translate3d(-1%, 0, 0);
+  }
+  to {
+    transform: scale(1.14) translate3d(1.5%, -1.5%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .photo-band--drift > img {
+    animation: drift 34s var(--ease-in-out) infinite alternate;
+    will-change: transform;
+  }
+}
+
+.photo-band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(105deg, rgba(8, 24, 41, 0.94) 0%, rgba(8, 24, 41, 0.8) 42%, rgba(8, 24, 41, 0.45) 100%);
+}
+
+/* On a phone the text covers the full width, so the scrim has to run top to
+   bottom rather than across. Kept light enough at the top that the photograph
+   is still visible: white body copy sits at roughly 8:1 against it. */
+@media (max-width: 767px) {
+  .photo-band::after {
+    background: linear-gradient(
+      180deg,
+      rgba(8, 24, 41, 0.58) 0%,
+      rgba(8, 24, 41, 0.84) 46%,
+      rgba(8, 24, 41, 0.92) 100%
+    );
+  }
+}
+
+/* The small photographic chip on a category card. */
+.photo-chip {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: var(--paper-sunken);
+}
+
+.photo-chip > img {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 520ms var(--ease-out);
+}
+
+@media (hover: hover) {
+  .group:hover .photo-chip > img {
+    transform: scale(1.06);
   }
 }
 
