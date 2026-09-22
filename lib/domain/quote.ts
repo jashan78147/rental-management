@@ -1,6 +1,6 @@
 import { allProducts, categoryById, pricelists, profileById, settings } from "@/lib/data/store";
 import { availableUnits, nextFreeWindow } from "./availability";
-import { durationHours, priceLine, round2, selectPricelist } from "./pricing";
+import { durationHours, priceLine, round2, selectPricelists } from "./pricing";
 import type { CartItem, CustomerSegment, PriceChunk, Reservation } from "./types";
 
 export interface QuoteLine {
@@ -13,6 +13,8 @@ export interface QuoteLine {
   available: number;
   shortBy: number;
   chunks: PriceChunk[];
+  /** Which list actually supplied this line's rates. */
+  pricelistName: string;
   gross: number;
   discount: number;
   net: number;
@@ -52,8 +54,8 @@ export function buildQuote(args: {
 
   const profile = customerId ? profileById(customerId) : undefined;
   const segment: CustomerSegment = profile?.segment ?? "retail";
-  const pricelist =
-    selectPricelist(pricelists, segment, new Date(startsAt)) ?? pricelists[0];
+  const applicable = selectPricelists(pricelists, segment, new Date(startsAt));
+  const lists = applicable.length > 0 ? applicable : [pricelists[0]];
 
   const hours = durationHours(startsAt, endsAt);
 
@@ -62,7 +64,7 @@ export function buildQuote(args: {
       const product = allProducts.find((p) => p.id === item.productId);
       if (!product) return null;
 
-      const pricing = priceLine({ product, quantity: item.quantity, startsAt, endsAt, pricelist });
+      const pricing = priceLine({ product, quantity: item.quantity, startsAt, endsAt, pricelists: lists });
       const available = availableUnits(product, reservations, startsAt, endsAt, ignoreOrderId);
       const shortBy = Math.max(0, item.quantity - available);
 
@@ -76,6 +78,7 @@ export function buildQuote(args: {
         available,
         shortBy,
         chunks: pricing.chunks,
+        pricelistName: pricing.pricelistName,
         gross: pricing.gross,
         discount: pricing.discount,
         net: pricing.net,
@@ -102,8 +105,11 @@ export function buildQuote(args: {
     startsAt,
     endsAt,
     hours,
-    pricelistId: pricelist.id,
-    pricelistName: pricelist.name,
+    pricelistId: lists[0].id,
+    // Name the lists that actually priced something rather than the one that
+    // merely ranked highest, which may not cover any of these products.
+    pricelistName:
+      [...new Set(lines.map((l) => l.pricelistName))].join(" and ") || lists[0].name,
     segment,
     lines,
     subtotal,

@@ -1,5 +1,5 @@
 import { assessLateFee } from "@/lib/domain/fees";
-import { priceLine, round2, selectPricelist } from "@/lib/domain/pricing";
+import { priceLine, round2, selectPricelists } from "@/lib/domain/pricing";
 import type {
   AppNotification,
   Delivery,
@@ -63,8 +63,8 @@ export function buildSeedDataset(): Dataset {
       new Date(startsAt).getTime() + seed.durationHours * 3_600_000,
     ).toISOString();
 
-    const pricelist =
-      selectPricelist(pricelists, customer.segment, new Date(startsAt)) ?? pricelists[0];
+    const applicable = selectPricelists(pricelists, customer.segment, new Date(startsAt));
+    const lists = applicable.length > 0 ? applicable : [pricelists[0]];
 
     const orderId = `o-${index + 1}`;
     const lines: OrderLine[] = [];
@@ -81,7 +81,7 @@ export function buildSeedDataset(): Dataset {
         quantity: item.quantity,
         startsAt,
         endsAt,
-        pricelist,
+        pricelists: lists,
       });
 
       const primary = pricing.chunks[0];
@@ -116,7 +116,7 @@ export function buildSeedDataset(): Dataset {
       status: seed.status,
       startsAt,
       endsAt,
-      pricelistId: pricelist.id,
+      pricelistId: lists[0].id,
       subtotal,
       discountTotal,
       taxTotal,

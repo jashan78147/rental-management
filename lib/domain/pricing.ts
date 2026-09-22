@@ -33,50 +33,127 @@ export function durationHours(startsAt: string, endsAt: string): number {
 }
 
 /**
- * Pick the pricelist that applies to a customer on a given date.
- * A list scoped to the customer's segment beats a general one; ties break on priority.
+ * Every pricelist that applies to a customer on a given date, in precedence
+ * order: a list scoped to the customer's segment beats a general one, then
+ * higher priority wins.
+ *
+ * This returns the whole ordered set rather than a single winner because a
+ * pricelist may only cover part of the catalog. A seasonal card that prices
+ * staging must not blank out camera rates just because it outranks the base
+ * card; anything it does not price falls through to the next list.
  */
+export function selectPricelists(
+  pricelists: Pricelist[],
+  segment: CustomerSegment,
+  onDate: Date = new Date(),
+): Pricelist[] {
+  const day = onDate.toISOString().slice(0, 10);
+
+  return pricelists
+    .filter((pl) => {
+      if (!pl.isActive) return false;
+      if (pl.segment && pl.segment !== segment) return false;
+      if (pl.validFrom && day < pl.validFrom) return false;
+      if (pl.validTo && day > pl.validTo) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const aScoped = a.segment ? 1 : 0;
+      const bScoped = b.segment ? 1 : 0;
+      if (aScoped !== bScoped) return bScoped - aScoped;
+      return b.priority - a.priority;
+    });
+}
+
+/** The highest-precedence list that applies, used for display and for the order record. */
 export function selectPricelist(
   pricelists: Pricelist[],
   segment: CustomerSegment,
   onDate: Date = new Date(),
 ): Pricelist | undefined {
-  const day = onDate.toISOString().slice(0, 10);
-  const eligible = pricelists.filter((pl) => {
-    if (!pl.isActive) return false;
-    if (pl.segment && pl.segment !== segment) return false;
-    if (pl.validFrom && day < pl.validFrom) return false;
-    if (pl.validTo && day > pl.validTo) return false;
-    return true;
-  });
+  return selectPricelists(pricelists, segment, onDate)[0];
+}
 
-  return eligible.sort((a, b) => {
-    const aScoped = a.segment ? 1 : 0;
-    const bScoped = b.segment ? 1 : 0;
-    if (aScoped !== bScoped) return bScoped - aScoped;
-    return b.priority - a.priority;
-  })[0];
+/** How specifically a rule targets a product: product beats category beats catalog-wide. */
+function scopeScore(rule: PricelistRule, product: Product): number {
+  if (rule.productId) return rule.productId === product.id ? 3 : 0;
+  if (rule.categoryId) return rule.categoryId === product.categoryId ? 2 : 0;
+  return 1;
+}
+
+export interface ResolvedRates {
+  rates: Partial<Record<DurationUnit, PricelistRule>>;
+  /** Which list supplied each unit rate, so the quote can say where a price came from. */
+  sources: Partial<Record<DurationUnit, string>>;
 }
 
 /**
- * Resolve the rate card for one product inside one pricelist.
- * Specificity: a product rule beats a category rule, which beats a catalog-wide rule.
+ * Resolve a rate card for one product across the eligible lists.
+ *
+ * Within a list, the most specific matching rule wins. Across lists, the first
+ * list to define a given unit wins and later lists cannot override it. Rules
+ * priced at or below zero are discount modifiers, not rates, so they never
+ * become the price.
  */
-export function resolveRates(
-  pricelist: Pricelist,
-  product: Product,
-): Partial<Record<DurationUnit, PricelistRule>> {
-  const scoreOf = (r: PricelistRule) =>
-    r.productId === product.id ? 3 : r.categoryId === product.categoryId ? 2 : !r.productId && !r.categoryId ? 1 : 0;
+export function resolveRates(lists: Pricelist[], product: Product): ResolvedRates {
+  const rates: Partial<Record<DurationUnit, PricelistRule>> = {};
+  const sources: Partial<Record<DurationUnit, string>> = {};
 
-  const out: Partial<Record<DurationUnit, PricelistRule>> = {};
-  for (const rule of pricelist.rules) {
-    const score = scoreOf(rule);
-    if (score === 0) continue;
-    const current = out[rule.unit];
-    if (!current || scoreOf(current) < score) out[rule.unit] = rule;
+  for (const list of lists) {
+    const best: Partial<Record<DurationUnit, PricelistRule>> = {};
+
+    for (const rule of list.rules) {
+      if (rule.price <= 0) continue;
+      const score = scopeScore(rule, product);
+      if (score === 0) continue;
+      const current = best[rule.unit];
+      if (!current || scopeScore(current, product) < score) best[rule.unit] = rule;
+    }
+
+    for (const [unit, rule] of Object.entries(best) as [DurationUnit, PricelistRule][]) {
+      if (rates[unit]) continue;
+      rates[unit] = rule;
+      sources[unit] = list.id;
+    }
   }
-  return out;
+
+  return { rates, sources };
+}
+
+export interface ResolvedDiscount {
+  percent: number;
+  fixed: number;
+  pricelistId?: string;
+  pricelistName?: string;
+}
+
+/**
+ * Discounts come from the highest-precedence list that defines one for this
+ * product. They are not summed across lists, so two overlapping promotions
+ * cannot quietly compound into a bigger discount than either one offers.
+ */
+export function resolveDiscount(lists: Pricelist[], product: Product): ResolvedDiscount {
+  for (const list of lists) {
+    let best: PricelistRule | undefined;
+
+    for (const rule of list.rules) {
+      if (rule.discountPercent <= 0 && rule.discountFixed <= 0) continue;
+      const score = scopeScore(rule, product);
+      if (score === 0) continue;
+      if (!best || scopeScore(best, product) < score) best = rule;
+    }
+
+    if (best) {
+      return {
+        percent: best.discountPercent,
+        fixed: best.discountFixed,
+        pricelistId: list.id,
+        pricelistName: list.name,
+      };
+    }
+  }
+
+  return { percent: 0, fixed: 0 };
 }
 
 interface Step {
@@ -154,27 +231,35 @@ function greedyChunks(
   return chunks;
 }
 
-/** Price one catalog line across the rental window. */
+/**
+ * Price one catalog line across the rental window.
+ *
+ * Takes the ordered list of eligible pricelists rather than a single one, so a
+ * partial seasonal card cannot leave a product with no rate at all.
+ */
 export function priceLine(args: {
   product: Product;
   quantity: number;
   startsAt: string;
   endsAt: string;
-  pricelist: Pricelist;
+  pricelists: Pricelist[];
 }): LinePricing {
-  const { product, quantity, startsAt, endsAt, pricelist } = args;
+  const { product, quantity, startsAt, endsAt, pricelists } = args;
   const hours = durationHours(startsAt, endsAt);
-  const rates = resolveRates(pricelist, product);
+  const { rates, sources } = resolveRates(pricelists, product);
   const chunks = cheapestChunks(hours, rates);
 
   const perUnitGross = chunks.reduce((sum, c) => sum + c.subtotal, 0);
   const gross = round2(perUnitGross * quantity);
 
-  // Discounts come from the rules that actually priced this line.
-  const applied = chunks.map((c) => rates[c.unit]!).filter(Boolean);
-  const percent = Math.max(0, ...applied.map((r) => r.discountPercent), 0);
-  const fixed = applied.reduce((sum, r) => sum + r.discountFixed, 0) * quantity;
-  const discount = round2(Math.min(gross, gross * (percent / 100) + fixed));
+  const { percent, fixed, pricelistId: discountListId } = resolveDiscount(pricelists, product);
+  const discount = round2(Math.min(gross, gross * (percent / 100) + fixed * quantity));
+
+  // Attribute the line to whichever list actually supplied its rates, falling
+  // back to the discount's list, then to the highest-precedence list.
+  const ratingListId = chunks.length > 0 ? sources[chunks[0].unit] : undefined;
+  const attributed =
+    pricelists.find((p) => p.id === (ratingListId ?? discountListId)) ?? pricelists[0];
 
   const dayRate = rates.day?.price;
   const naiveDayRate =
@@ -185,8 +270,8 @@ export function priceLine(args: {
     gross,
     discount,
     net: round2(gross - discount),
-    pricelistId: pricelist.id,
-    pricelistName: pricelist.name,
+    pricelistId: attributed?.id ?? "",
+    pricelistName: attributed?.name ?? "No rate card",
     naiveDayRate,
   };
 }
