@@ -1,26 +1,262 @@
 @import "tailwindcss";
 
+/* --------------------------------------------------------------------------
+   Tokens. Warm paper and ink with a clay accent, so the console reads as a
+   working tool rather than a dashboard template.
+   -------------------------------------------------------------------------- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --paper: #faf7f2;
+  --paper-raised: #ffffff;
+  --paper-sunken: #f2ede4;
+  --ink: #191512;
+  --ink-soft: #5c5349;
+  --ink-faint: #8b8175;
+  --line: #e6dfd4;
+  --line-strong: #d3c9ba;
+
+  --clay: #a8441c;
+  --clay-hover: #8d3715;
+  --clay-tint: #f6e7de;
+  --on-clay: #fff8f4;
+
+  --pine: #145c52;
+  --pine-tint: #dbeeea;
+  --ochre: #8a660f;
+  --ochre-tint: #f6ecd2;
+  --rust: #9a2b2b;
+  --rust-tint: #f7e2e0;
+
+  --ring: #a8441c;
+  color-scheme: light;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+:root:not([data-theme="light"]) {
+  @media (prefers-color-scheme: dark) {
+    --paper: #141210;
+    --paper-raised: #1c1916;
+    --paper-sunken: #100e0c;
+    --ink: #f5f0e8;
+    --ink-soft: #a59c90;
+    --ink-faint: #7b7367;
+    --line: #2e2924;
+    --line-strong: #453e35;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --clay: #e0763f;
+    --clay-hover: #ef8b56;
+    --clay-tint: #2e1c13;
+    --on-clay: #1a0f08;
+
+    --pine: #4fb3a2;
+    --pine-tint: #13302c;
+    --ochre: #d6a93c;
+    --ochre-tint: #2d2513;
+    --rust: #e06a6a;
+    --rust-tint: #33191a;
+
+    --ring: #e0763f;
+    color-scheme: dark;
   }
 }
 
+:root[data-theme="dark"] {
+  --paper: #141210;
+  --paper-raised: #1c1916;
+  --paper-sunken: #100e0c;
+  --ink: #f5f0e8;
+  --ink-soft: #a59c90;
+  --ink-faint: #7b7367;
+  --line: #2e2924;
+  --line-strong: #453e35;
+
+  --clay: #e0763f;
+  --clay-hover: #ef8b56;
+  --clay-tint: #2e1c13;
+  --on-clay: #1a0f08;
+
+  --pine: #4fb3a2;
+  --pine-tint: #13302c;
+  --ochre: #d6a93c;
+  --ochre-tint: #2d2513;
+  --rust: #e06a6a;
+  --rust-tint: #33191a;
+
+  --ring: #e0763f;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-raised: var(--paper-raised);
+  --color-sunken: var(--paper-sunken);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-clay: var(--clay);
+  --color-clay-hover: var(--clay-hover);
+  --color-clay-tint: var(--clay-tint);
+  --color-on-clay: var(--on-clay);
+  --color-pine: var(--pine);
+  --color-pine-tint: var(--pine-tint);
+  --color-ochre: var(--ochre);
+  --color-ochre-tint: var(--ochre-tint);
+  --color-rust: var(--rust);
+  --color-rust-tint: var(--rust-tint);
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-karla), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-face), ui-monospace, SFMono-Regular, monospace;
+
+  --radius-card: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Base
+   -------------------------------------------------------------------------- */
+* {
+  border-color: var(--line);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "kern", "liga";
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  text-wrap: balance;
+  letter-spacing: -0.022em;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+[id] {
+  scroll-margin-top: 6rem;
+}
+
+/* Number columns line up; this is a money product. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Utilities
+   -------------------------------------------------------------------------- */
+.card {
+  background-color: var(--paper-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+}
+
+.hairline {
+  background-image: linear-gradient(to right, transparent, var(--line-strong), transparent);
+  height: 1px;
+}
+
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Motion. Every animation here is transform or opacity only, and every one
+   of them is switched off under prefers-reduced-motion.
+   -------------------------------------------------------------------------- */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translate3d(-100%, 0, 0);
+  }
+  to {
+    transform: translate3d(200%, 0, 0);
+  }
+}
+
+.animate-rise {
+  animation: rise 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform, opacity;
+}
+
+.animate-fade {
+  animation: fade 420ms ease-out both;
+}
+
+.animate-sweep {
+  animation: sweep 1400ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .animate-rise,
+  .animate-fade,
+  .animate-sweep {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop-blur-sticky {
+    backdrop-filter: none;
+    background-color: var(--paper);
+  }
 }
